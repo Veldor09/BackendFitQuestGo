@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      target: dev
+    ports:
+      - '3000:3000'
+    environment:
+      PORT: 3000
+      DATABASE_PATH: /app/data/db.sqlite
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - ./data:/app/data
