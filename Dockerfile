@@ -1,22 +1,20 @@
 # ---- Dev image: hot-reload for local work ----
 FROM node:22-slim AS dev
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
-RUN npm install
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-CMD ["npm", "run", "start:dev"]
+CMD ["pnpm", "run", "start:dev"]
 
 # ---- Build stage ----
 FROM node:22-slim AS builder
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
-RUN npm ci
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # ---- Production runtime ----
 FROM node:22-slim AS runtime

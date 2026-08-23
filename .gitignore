@@ -50,8 +50,3 @@ pids
 *.pid
 *.seed
 *.pid.lock
-
-# SQLite database (keep the folder, ignore the actual db file)
-/data/*.sqlite
-/data/*.sqlite3
-!/data/.gitkeep

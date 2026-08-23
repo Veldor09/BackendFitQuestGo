@@ -3,6 +3,5 @@ dist
 coverage
 .git
 .env
-data/*.sqlite
-data/*.sqlite3
 npm-debug.log
+pnpm-debug.log
