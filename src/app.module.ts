@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { AuthModule } from './Modules/Auth/auth.module';
+import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
 
 @Module({
@@ -17,10 +20,13 @@ import { UserModule } from './Modules/Usuarios/user.module';
         password: process.env.DB_PASSWORD,
         database: process.env.DB_DATABASE,
         autoLoadEntities: true,
+        namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
       }),
     }),
     UserModule,
+    RoleModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],
