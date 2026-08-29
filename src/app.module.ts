@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { UserModule } from './Modules/Usuarios/user.module';
 
 @Module({
   imports: [
@@ -10,18 +9,20 @@ import { AppService } from './app.service';
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'sqlite' as const,
-        database: config.get<string>('DATABASE_PATH', './data/db.sqlite'),
+      useFactory: () => ({
+        type: 'postgres',
+        host: process.env.DB_HOST,
+        port: Number(process.env.DB_PORT),
+        username: process.env.DB_USERNAME,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE,
         autoLoadEntities: true,
-        // Auto-syncs entities to schema — fine while there's no real data yet,
-        // switch to migrations before this holds anything worth keeping.
-        synchronize: true,
+        synchronize: false,
       }),
     }),
+    UserModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}
