@@ -1,12 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import {Column,CreateDateColumn,Entity,Index,JoinColumn,ManyToOne,PrimaryGeneratedColumn,} from 'typeorm';
 import { User } from '../Usuarios/user.entity';
 
 @Entity('auth')
@@ -18,7 +10,6 @@ export class Auth {
   @Column()
   usuarioId: number;
 
-  // Nunca se guarda el token en claro, solo su hash.
   @Column({ type: 'varchar', length: 255, unique: true })
   tokenHash: string;
 
