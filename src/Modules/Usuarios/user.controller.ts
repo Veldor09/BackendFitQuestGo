@@ -1,9 +1,15 @@
-import {Body,Controller,Delete,Get,HttpCode,HttpStatus,Param,ParseIntPipe,Put,Post,} from '@nestjs/common';
+import {Body,Controller,Delete,Get,HttpCode,HttpStatus,Param,ParseIntPipe,Put,Post,UseGuards,} from '@nestjs/common';
 import {CreateUserDto,UpdateUserDto,} from './dto/UserDTO';
 import { User } from './user.entity';
 import { UserService } from './user.service';
+import { GuardiaJwt } from '../Auth/guards/jwt.guard';
+import { GuardiaRoles } from '../Auth/guards/roles.guard';
+import { Roles } from '../Auth/decorators/roles.decorator';
+import { RoleId } from './roles.enum';
 
 @Controller('usuarios')
+@UseGuards(GuardiaJwt, GuardiaRoles)
+@Roles(RoleId.Admin)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

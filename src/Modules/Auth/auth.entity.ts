@@ -3,6 +3,7 @@ import { User } from '../Usuarios/user.entity';
 
 @Entity('auth')
 @Index(['usuarioId'])
+@Index(['familia'])
 export class Auth {
   @PrimaryGeneratedColumn()
   idAuth: number;
@@ -11,22 +12,30 @@ export class Auth {
   usuarioId: number;
 
   @Column({ type: 'varchar', length: 255, unique: true })
-  tokenHash: string;
+  hashToken: string;
+
+  @Column({ type: 'uuid' })
+  familia: string;
 
   @Column({ type: 'timestamptz' })
-  expiresAt: Date;
+  expiraEn: Date;
 
   @Column({ type: 'boolean', default: false })
-  revoked: boolean;
+  revocado: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  agenteUsuario: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  ip: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
-  createdAt: Date;
+  creadoEn: Date;
 
   @ManyToOne(() => User, (user) => user.sesiones, {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  // Explicito para que la FK reutilice la columna usuario_id de arriba.
   @JoinColumn({ name: 'usuario_id' })
   usuario: User;
 }
