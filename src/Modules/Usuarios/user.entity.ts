@@ -1,13 +1,35 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
+import {Column,Entity,JoinColumn,ManyToOne,OneToMany,PrimaryGeneratedColumn,} from 'typeorm';
+import { Auth } from '../Auth/auth.entity';
+import { Role } from './roles.entity';
 
 @Entity('usuarios')
+
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ type: 'varchar', length: 100 })
-  nombre: string;
+  nombreUser: string;
 
-  @Column({ type: 'int' })
-  edad: number;
+  @Column({ type: 'varchar', length: 100, unique: true })
+  emailUser: string;
+
+  @Exclude()
+  @Column({ type: 'varchar', length: 255 })
+  passwordUserHash: string;
+
+  @Column()
+  idrol: number;
+
+  @ManyToOne(() => Role, (role) => role.usuarios, {
+    eager: true,
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'idrol' })
+  rol: Role;
+
+  @OneToMany(() => Auth, (auth) => auth.usuario)
+  sesiones: Auth[];
 }
