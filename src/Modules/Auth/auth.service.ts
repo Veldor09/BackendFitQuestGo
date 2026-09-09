@@ -105,6 +105,10 @@ export class AuthService {
     };
   }
 
+  obtenerPerfil(usuarioId: number): Promise<User> {
+    return this.userService.findOneUser(usuarioId);
+  }
+
   async cerrarSesion(refreshTokenPlano: string | undefined): Promise<void> {
     if (refreshTokenPlano) {
       await this.tokens.revocarPorToken(refreshTokenPlano);

@@ -10,6 +10,7 @@ import { RenovarDto } from './dto/renovar.dto';
 import { GuardiaJwt } from './guards/jwt.guard';
 import { UsuarioActual } from './decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from './types/carga-jwt';
+import type { User } from '../Usuarios/user.entity';
 
 const COOKIE_ACCESS = 'access_token';
 const COOKIE_REFRESH = 'refresh_token';
@@ -102,6 +103,12 @@ export class AuthController {
   @UseGuards(GuardiaJwt)
   yo(@UsuarioActual() usuario: UsuarioAutenticado): UsuarioAutenticado {
     return usuario;
+  }
+
+  @Get('perfil')
+  @UseGuards(GuardiaJwt)
+  perfil(@UsuarioActual() usuario: UsuarioAutenticado): Promise<User> {
+    return this.authService.obtenerPerfil(usuario.id);
   }
 
   private cuerpoRespuesta(
