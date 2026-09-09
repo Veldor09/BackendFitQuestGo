@@ -1,28 +1,44 @@
 import { PartialType } from '@nestjs/mapped-types';
-import {IsEmail,IsEnum,IsNotEmpty,IsString,MaxLength,MinLength,} from 'class-validator';
+import {IsEmail,IsEnum,IsNotEmpty,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
+import {
+  MAX_NOMBRE_USUARIO,
+  MENSAJE_NOMBRE_INVALIDO,
+  NOMBRE_PERSONA_REGEX,
+} from '../../../common/reglas-usuario';
+import { EstadoUsuario } from '../estado.enum';
 import { RoleId } from '../roles.enum';
 
 export class CreateUserDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @IsNotEmpty({ message: 'El nombre es obligatorio' })
+  @MaxLength(MAX_NOMBRE_USUARIO, {
+    message: `El nombre admite maximo ${MAX_NOMBRE_USUARIO} caracteres`,
+  })
+  @Matches(NOMBRE_PERSONA_REGEX, { message: MENSAJE_NOMBRE_INVALIDO })
   nombreUser: string;
 
-  @IsEmail()
-  @MaxLength(100)
+  @IsEmail({}, { message: 'El correo no tiene un formato valido' })
+  @MaxLength(100, { message: 'El correo admite maximo 100 caracteres' })
   emailUser: string;
 
   @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
+  @IsNotEmpty({ message: 'La contrasena es obligatoria' })
+  @MinLength(8, { message: 'La contrasena debe tener al menos 8 caracteres' })
   passwordUserHash: string;
 
   // La columna idrol es NOT NULL, asi que el rol es obligatorio al crear.
   @IsEnum(RoleId, {
-    message: 'idrol debe ser 1 (UserNormal), 2 (Empresa) o 3 (Admin)',
+    message: 'El rol debe ser Usuario (1), Empresa (2) o Admin (3)',
   })
   idrol: RoleId;
 }
 
 // Todos los campos de CreateUserDto pero opcionales, conservando sus validaciones.
 export class UpdateUserDto extends PartialType(CreateUserDto) {}
+
+export class CambiarEstadoDto {
+  @IsEnum(EstadoUsuario, {
+    message: 'El estado debe ser Activado o Desactivado',
+  })
+  estado: EstadoUsuario;
+}

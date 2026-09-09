@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../Usuarios/user.entity';
 import { UserService } from '../Usuarios/user.service';
+import { EstadoUsuario } from '../Usuarios/estado.enum';
 import { RoleId } from '../Usuarios/roles.enum';
 import { ContrasenasServicio } from './services/contrasenas.service';
 import { TokensServicio } from './services/tokens.service';
@@ -44,11 +45,11 @@ export class AuthService {
     dto: RegistroDto,
     datos: DatosCliente,
   ): Promise<ResultadoAuth> {
-    const hash = await this.contrasenas.hashear(dto.contrasena);
+    // `createUser` se encarga de hashear la contrasena.
     const usuario = await this.userService.createUser({
       nombreUser: dto.nombre,
       emailUser: dto.email,
-      passwordUserHash: hash,
+      passwordUserHash: dto.contrasena,
       idrol: RoleId.UserNormal,
     });
     return this.emitirSesion(usuario, datos);
@@ -68,6 +69,11 @@ export class AuthService {
     if (!usuario || !valido) {
       throw new UnauthorizedException('Credenciales invalidas');
     }
+    if (usuario.estado === EstadoUsuario.Desactivado) {
+      throw new UnauthorizedException(
+        'Tu cuenta esta desactivada. Contacta al administrador.',
+      );
+    }
     return this.emitirSesion(usuario, datos);
   }
 
@@ -82,6 +88,9 @@ export class AuthService {
     const usuario = await this.usuarios.findOne({ where: { id: usuarioId } });
     if (!usuario) {
       throw new UnauthorizedException('Usuario no encontrado');
+    }
+    if (usuario.estado === EstadoUsuario.Desactivado) {
+      throw new UnauthorizedException('Tu cuenta esta desactivada.');
     }
     const accessToken = await this.tokens.firmarAccessToken({
       sub: usuario.id,

@@ -1,7 +1,9 @@
 import {ConflictException,Injectable,NotFoundException,} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {QueryFailedError,Repository,} from 'typeorm';
+import { ContrasenasServicio } from '../Auth/services/contrasenas.service';
 import {CreateUserDto,UpdateUserDto,} from './dto/UserDTO';
+import { EstadoUsuario } from './estado.enum';
 import { Role } from './roles.entity';
 import { User } from './user.entity';
 
@@ -16,6 +18,7 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    private readonly contrasenas: ContrasenasServicio,
   ) {}
 
   findAll(): Promise<User[]> {
@@ -34,26 +37,33 @@ export class UserService {
 
   async createUser(dto: CreateUserDto): Promise<User> {
     const user = this.userRepository.create(dto);
+    // `passwordUserHash` llega en texto plano desde el DTO; aqui se hashea.
+    user.passwordUserHash = await this.contrasenas.hashear(dto.passwordUserHash);
     user.rol = await this.getRole(dto.idrol);
     return this.save(user);
   }
 
   async updateUser(id: number, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOneUser(id);
-    this.userRepository.merge(user, dto);
+    const { passwordUserHash, ...resto } = dto;
+    this.userRepository.merge(user, resto);
+    if (passwordUserHash !== undefined && passwordUserHash !== '') {
+      user.passwordUserHash = await this.contrasenas.hashear(passwordUserHash);
+    }
     if (dto.idrol !== undefined) {
       user.rol = await this.getRole(dto.idrol);
     }
     return this.save(user);
   }
 
-  //Se cambiara a desactivar pronto 
-
-  async removeUser(id: number): Promise<void> {
-    const result = await this.userRepository.delete(id);
-    if (!result.affected) {
-      throw new NotFoundException(`Usuario ${id} no encontrado`);
-    }
+  /**
+   * Baja / alta logica. No borra la fila: solo cambia el `estado`. Un usuario
+   * Desactivado no puede iniciar sesion ni renovar su token.
+   */
+  async cambiarEstado(id: number, estado: EstadoUsuario): Promise<User> {
+    const user = await this.findOneUser(id);
+    user.estado = estado;
+    return this.userRepository.save(user);
   }
 
   
