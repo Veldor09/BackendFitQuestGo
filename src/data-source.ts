@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { DataSource } from 'typeorm';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 //Para CLI de migraciones
 export default new DataSource({
@@ -11,4 +12,5 @@ export default new DataSource({
   database: process.env.DB_DATABASE,
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],
+  namingStrategy: new SnakeNamingStrategy(),
 });
