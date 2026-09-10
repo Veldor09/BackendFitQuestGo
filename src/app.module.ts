@@ -4,7 +4,10 @@ import { APP_GUARD } from '@nestjs/core';
 import {ThrottlerModule,ThrottlerGuard,} from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
+import { NodoModule } from './Modules/Nodos/nodo.module';
+import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
 
@@ -30,6 +33,9 @@ import { UserModule } from './Modules/Usuarios/user.module';
     UserModule,
     RoleModule,
     AuthModule,
+    NodoModule,
+    RutaModule,
+    AlertaModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
