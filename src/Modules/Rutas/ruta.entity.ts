@@ -1,0 +1,50 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { User } from '../Usuarios/user.entity';
+import { EstadoRuta } from './estado-ruta.enum';
+
+export interface PuntoRuta {
+  lat: number;
+  lng: number;
+}
+
+@Entity('rutas')
+export class Ruta {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: 'varchar', length: 100 })
+  nombre: string;
+
+  // Texto libre (Ciclismo, Running, Caminata, Hiking, ...).
+  @Column({ type: 'varchar', length: 30 })
+  actividad: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'moderada' })
+  dificultad: string;
+
+  @Column({ type: 'decimal', precision: 6, scale: 2, default: 0 })
+  distanciaKm: number;
+
+  // Trazo simplificado: lista ordenada de puntos. Sin PostGIS por ahora.
+  @Column({ type: 'jsonb' })
+  puntos: PuntoRuta[];
+
+  @Column({ type: 'varchar', length: 20, default: EstadoRuta.Privada })
+  estado: EstadoRuta;
+
+  @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'creado_por' })
+  creadoPor: User;
+
+  // `timestamptz` explicito: ver nota en Nodo.creadoEn sobre por que el tipo
+  // `timestamp` por defecto desfasa la hora al leerla de vuelta.
+  @CreateDateColumn({ type: 'timestamptz' })
+  creadoEn: Date;
+}
