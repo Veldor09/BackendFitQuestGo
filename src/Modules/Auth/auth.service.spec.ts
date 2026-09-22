@@ -23,6 +23,7 @@ describe('AuthService — recuperacion de contrasena', () => {
   let contrasenas: jest.Mocked<
     Pick<ContrasenasServicio, 'hashear' | 'verificar'>
   >;
+  let tokens: jest.Mocked<Pick<TokensServicio, 'revocarTodasDelUsuario'>>;
 
   beforeEach(async () => {
     usuarios = { findOne: jest.fn(), update: jest.fn() };
@@ -37,6 +38,7 @@ describe('AuthService — recuperacion de contrasena', () => {
       hashear: jest.fn().mockResolvedValue('hash-nuevo'),
       verificar: jest.fn(),
     };
+    tokens = { revocarTodasDelUsuario: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,7 +50,7 @@ describe('AuthService — recuperacion de contrasena', () => {
         },
         { provide: UserService, useValue: {} },
         { provide: ContrasenasServicio, useValue: contrasenas },
-        { provide: TokensServicio, useValue: {} },
+        { provide: TokensServicio, useValue: tokens },
         { provide: MailService, useValue: mail },
       ],
     }).compile();
@@ -113,6 +115,27 @@ describe('AuthService — recuperacion de contrasena', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
+    it('lanza UnauthorizedException si el restablecimiento esta expirado', async () => {
+      usuarios.findOne.mockResolvedValue({
+        id: 5,
+        emailUser: 'ana@x.co',
+      } as User);
+      restablecimientos.findOne.mockResolvedValue({
+        id: 9,
+        usuarioId: 5,
+        usado: false,
+        expiraEn: new Date(Date.now() - 1_000), // ya vencido
+      } as RestablecimientoContrasena);
+
+      await expect(
+        service.restablecerContrasena({
+          email: 'ana@x.co',
+          codigo: '123456',
+          nuevaContrasena: 'nueva12345',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
     it('actualiza la contrasena y marca el restablecimiento como usado', async () => {
       usuarios.findOne.mockResolvedValue({
         id: 5,
@@ -140,6 +163,7 @@ describe('AuthService — recuperacion de contrasena', () => {
         { id: 9 },
         { usado: true },
       );
+      expect(tokens.revocarTodasDelUsuario).toHaveBeenCalledWith(5);
     });
   });
 });

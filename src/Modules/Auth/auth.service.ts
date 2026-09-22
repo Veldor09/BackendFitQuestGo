@@ -135,6 +135,11 @@ export class AuthService {
     });
     if (!usuario) return; // no revelar si el correo existe
 
+    await this.restablecimientos.update(
+      { usuarioId: usuario.id, usado: false },
+      { usado: true },
+    );
+
     const codigo = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const registro = this.restablecimientos.create({
       usuarioId: usuario.id,
@@ -143,7 +148,10 @@ export class AuthService {
       usado: false,
     });
     await this.restablecimientos.save(registro);
-    await this.mail.enviarCodigoRecuperacion(usuario.emailUser, codigo);
+    this.mail.enviarCodigoRecuperacion(usuario.emailUser, codigo).catch(() => {
+      // El envio de correo es best-effort: si falla, no debe filtrarse al
+      // llamador (revelaria que el usuario existe) ni bloquear la respuesta.
+    });
   }
 
   async restablecerContrasena(dto: RestablecerContrasenaDto): Promise<void> {
@@ -171,6 +179,7 @@ export class AuthService {
       { passwordUserHash: nuevoHash },
     );
     await this.restablecimientos.update({ id: registro.id }, { usado: true });
+    await this.tokens.revocarTodasDelUsuario(usuario.id);
   }
 
   private async emitirSesion(
