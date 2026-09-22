@@ -1,14 +1,18 @@
-import {Injectable,UnauthorizedException,} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { createHash, randomInt } from 'crypto';
 import { User } from '../Usuarios/user.entity';
 import { UserService } from '../Usuarios/user.service';
 import { EstadoUsuario } from '../Usuarios/estado.enum';
 import { RoleId } from '../Usuarios/roles.enum';
 import { ContrasenasServicio } from './services/contrasenas.service';
 import { TokensServicio } from './services/tokens.service';
+import { MailService } from './services/mail.service';
+import { RestablecimientoContrasena } from './entities/restablecimiento-contrasena.entity';
 import { RegistroDto } from './dto/registro.dto';
 import { InicioSesionDto } from './dto/inicio-sesion.dto';
+import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
 
 interface DatosCliente {
   agenteUsuario?: string | null;
@@ -32,13 +36,18 @@ export interface ResultadoAuth {
 const HASH_FALSO =
   '$2b$12$GOaQIwl0Koy33EDKB3xzLuo7yhQdhaXF3PATrMnHFpvFYI8LljMBa';
 
+const MINUTOS_EXPIRACION_CODIGO = 15;
+
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private readonly usuarios: Repository<User>,
+    @InjectRepository(RestablecimientoContrasena)
+    private readonly restablecimientos: Repository<RestablecimientoContrasena>,
     private readonly userService: UserService,
     private readonly contrasenas: ContrasenasServicio,
     private readonly tokens: TokensServicio,
+    private readonly mail: MailService,
   ) {}
 
   async registrar(
@@ -120,6 +129,50 @@ export class AuthService {
     return this.tokens.revocarTodasDelUsuario(usuarioId);
   }
 
+  async olvideContrasena(email: string): Promise<void> {
+    const usuario = await this.usuarios.findOne({
+      where: { emailUser: email },
+    });
+    if (!usuario) return; // no revelar si el correo existe
+
+    const codigo = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const registro = this.restablecimientos.create({
+      usuarioId: usuario.id,
+      hashCodigo: this.hashCodigo(codigo),
+      expiraEn: new Date(Date.now() + MINUTOS_EXPIRACION_CODIGO * 60_000),
+      usado: false,
+    });
+    await this.restablecimientos.save(registro);
+    await this.mail.enviarCodigoRecuperacion(usuario.emailUser, codigo);
+  }
+
+  async restablecerContrasena(dto: RestablecerContrasenaDto): Promise<void> {
+    const usuario = await this.usuarios.findOne({
+      where: { emailUser: dto.email },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException('Codigo invalido o expirado');
+    }
+
+    const registro = await this.restablecimientos.findOne({
+      where: {
+        usuarioId: usuario.id,
+        hashCodigo: this.hashCodigo(dto.codigo),
+        usado: false,
+      },
+    });
+    if (!registro || registro.expiraEn.getTime() < Date.now()) {
+      throw new UnauthorizedException('Codigo invalido o expirado');
+    }
+
+    const nuevoHash = await this.contrasenas.hashear(dto.nuevaContrasena);
+    await this.usuarios.update(
+      { id: usuario.id },
+      { passwordUserHash: nuevoHash },
+    );
+    await this.restablecimientos.update({ id: registro.id }, { usado: true });
+  }
+
   private async emitirSesion(
     usuario: User,
     datos: DatosCliente,
@@ -145,5 +198,9 @@ export class AuthService {
       email: usuario.emailUser,
       rol: usuario.idrol,
     };
+  }
+
+  private hashCodigo(codigo: string): string {
+    return createHash('sha256').update(codigo).digest('hex');
   }
 }
