@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UnauthorizedException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { AuthService } from './auth.service';
 import { User } from '../Usuarios/user.entity';
 import { UserService } from '../Usuarios/user.service';
@@ -14,11 +14,13 @@ describe('AuthService — recuperacion de contrasena', () => {
   let service: AuthService;
   let usuarios: jest.Mocked<Pick<Repository<User>, 'findOne' | 'update'>>;
   let restablecimientos: jest.Mocked<
-    Pick<
-      Repository<RestablecimientoContrasena>,
-      'findOne' | 'save' | 'create' | 'update'
-    >
-  >;
+    Pick<Repository<RestablecimientoContrasena>, 'findOne' | 'save' | 'update'>
+  > & {
+    create: jest.Mock<
+      RestablecimientoContrasena,
+      [DeepPartial<RestablecimientoContrasena>]
+    >;
+  };
   let mail: jest.Mocked<Pick<MailService, 'enviarCodigoRecuperacion'>>;
   let contrasenas: jest.Mocked<
     Pick<ContrasenasServicio, 'hashear' | 'verificar'>
