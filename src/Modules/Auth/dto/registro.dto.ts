@@ -1,4 +1,4 @@
-import {IsEmail,IsNotEmpty,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
+import {Equals,IsBoolean,IsEmail,IsNotEmpty,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
 import {
   MAX_NOMBRE_USUARIO,
   MENSAJE_NOMBRE_INVALIDO,
@@ -22,4 +22,8 @@ export class RegistroDto {
   @MinLength(8, { message: 'La contrasena debe tener al menos 8 caracteres' })
   @MaxLength(72)
   contrasena: string;
+
+  @IsBoolean({ message: 'aceptaTerminos debe ser booleano' })
+  @Equals(true, { message: 'Debes aceptar los terminos y condiciones' })
+  aceptaTerminos: boolean;
 }
