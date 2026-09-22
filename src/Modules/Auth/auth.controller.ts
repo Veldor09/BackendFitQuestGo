@@ -1,12 +1,25 @@
-import {Body,Controller,Get,HttpCode,HttpStatus,Post,Req,Res,UnauthorizedException,UseGuards,} from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type {Request,Response,} from 'express';
+import type { Request, Response } from 'express';
 import { AuthConfig } from './auth.config';
 import { AuthService } from './auth.service';
 import type { ResultadoAuth } from './auth.service';
 import { RegistroDto } from './dto/registro.dto';
 import { InicioSesionDto } from './dto/inicio-sesion.dto';
 import { RenovarDto } from './dto/renovar.dto';
+import { OlvideContrasenaDto } from './dto/olvide-contrasena.dto';
+import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
 import { GuardiaJwt } from './guards/jwt.guard';
 import { UsuarioActual } from './decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from './types/carga-jwt';
@@ -111,10 +124,30 @@ export class AuthController {
     return this.authService.obtenerPerfil(usuario.id);
   }
 
+  @Post('olvide-contrasena')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async olvideContrasena(@Body() dto: OlvideContrasenaDto): Promise<void> {
+    await this.authService.olvideContrasena(dto.email);
+  }
+
+  @Post('restablecer-contrasena')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async restablecerContrasena(
+    @Body() dto: RestablecerContrasenaDto,
+  ): Promise<void> {
+    await this.authService.restablecerContrasena(dto);
+  }
+
   private cuerpoRespuesta(
     req: Request,
     resultado: ResultadoAuth,
-  ): { usuario: ResultadoAuth['usuario']; accessToken: string; refreshToken?: string } {
+  ): {
+    usuario: ResultadoAuth['usuario'];
+    accessToken: string;
+    refreshToken?: string;
+  } {
     const cuerpo = {
       usuario: resultado.usuario,
       accessToken: resultado.accessToken,

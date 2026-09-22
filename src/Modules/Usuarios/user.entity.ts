@@ -26,6 +26,9 @@ export class User {
   @Column({ type: 'varchar', length: 20, default: EstadoUsuario.Activado })
   estado: EstadoUsuario;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  terminosAceptadosEn: Date | null;
+
   @ManyToOne(() => Role, (role) => role.usuarios, {
     eager: true,
     nullable: false,
