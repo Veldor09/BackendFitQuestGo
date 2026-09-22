@@ -20,6 +20,9 @@ export class RestablecimientoContrasena1791100000000
       CREATE INDEX "IDX_restablecimientos_usuario_id"
       ON "restablecimientos_contrasena" ("usuario_id")
     `);
+    await queryRunner.query(
+      `ALTER TABLE "restablecimientos_contrasena" ADD CONSTRAINT "FK_867496e067353c4c2658148aaef" FOREIGN KEY ("usuario_id") REFERENCES "usuarios"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

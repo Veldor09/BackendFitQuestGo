@@ -3,8 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { User } from '../../Usuarios/user.entity';
 
 @Entity('restablecimientos_contrasena')
 @Index(['usuarioId'])
@@ -26,4 +29,11 @@ export class RestablecimientoContrasena {
 
   @CreateDateColumn({ type: 'timestamptz' })
   creadoEn: Date;
+
+  @ManyToOne(() => User, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'usuario_id' })
+  usuario: User;
 }
