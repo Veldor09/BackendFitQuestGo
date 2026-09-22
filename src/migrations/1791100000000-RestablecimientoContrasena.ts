@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RestablecimientoContrasena1791100000000
-  implements MigrationInterface
-{
+export class RestablecimientoContrasena1791100000000 implements MigrationInterface {
   name = 'RestablecimientoContrasena1791100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

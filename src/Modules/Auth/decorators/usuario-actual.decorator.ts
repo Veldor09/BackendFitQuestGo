@@ -1,4 +1,4 @@
-import {createParamDecorator,ExecutionContext,} from '@nestjs/common';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { RequestAutenticado } from '../types/request-autenticado';
 import { UsuarioAutenticado } from '../types/carga-jwt';
 

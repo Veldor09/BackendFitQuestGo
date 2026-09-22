@@ -1,4 +1,4 @@
-import {MigrationInterface,QueryRunner,} from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class SeedRoles1787847558198 implements MigrationInterface {
   name = 'SeedRoles1787847558198';

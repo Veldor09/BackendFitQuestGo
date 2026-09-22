@@ -15,7 +15,9 @@ export class CrearAlertaDto {
   @MaxLength(50, { message: 'El tipo admite maximo 50 caracteres' })
   tipo: string;
 
-  @IsEnum(GravedadAlerta, { message: 'La gravedad debe ser baja, media o alta' })
+  @IsEnum(GravedadAlerta, {
+    message: 'La gravedad debe ser baja, media o alta',
+  })
   gravedad: GravedadAlerta;
 
   @IsLatitude({ message: 'lat debe ser una latitud valida' })

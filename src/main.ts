@@ -1,5 +1,5 @@
-import {ClassSerializerInterceptor,ValidationPipe,} from '@nestjs/common';
-import {NestFactory,Reflector,} from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 

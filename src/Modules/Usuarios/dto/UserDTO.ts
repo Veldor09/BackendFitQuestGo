@@ -1,6 +1,16 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
-import {IsDate,IsEmail,IsEnum,IsNotEmpty,IsOptional,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
+import {
+  IsDate,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import {
   MAX_NOMBRE_USUARIO,
   MENSAJE_NOMBRE_INVALIDO,
