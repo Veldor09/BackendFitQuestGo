@@ -20,4 +20,12 @@ export class AuthConfig {
   get cookieSegura(): boolean {
     return this.config.get<string>('COOKIE_SECURE', 'false') === 'true';
   }
+
+  get gmailUser(): string | undefined {
+    return this.config.get<string>('GMAIL_USER');
+  }
+
+  get gmailAppPassword(): string | undefined {
+    return this.config.get<string>('GMAIL_APP_PASSWORD');
+  }
 }
