@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash, randomInt } from 'crypto';
@@ -40,6 +40,8 @@ const MINUTOS_EXPIRACION_CODIGO = 15;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User) private readonly usuarios: Repository<User>,
     @InjectRepository(RestablecimientoContrasena)
@@ -148,10 +150,17 @@ export class AuthService {
       usado: false,
     });
     await this.restablecimientos.save(registro);
-    this.mail.enviarCodigoRecuperacion(usuario.emailUser, codigo).catch(() => {
-      // El envio de correo es best-effort: si falla, no debe filtrarse al
-      // llamador (revelaria que el usuario existe) ni bloquear la respuesta.
-    });
+    this.mail
+      .enviarCodigoRecuperacion(usuario.emailUser, codigo)
+      .catch((error: Error) => {
+        // El envio de correo es best-effort: si falla, no debe filtrarse al
+        // llamador (revelaria que el usuario existe) ni bloquear la respuesta),
+        // pero SI debe quedar visible en los logs del servidor.
+        this.logger.error(
+          `No se pudo enviar el codigo de recuperacion a un usuario: ${error.message}`,
+          error.stack,
+        );
+      });
   }
 
   async restablecerContrasena(dto: RestablecerContrasenaDto): Promise<void> {
