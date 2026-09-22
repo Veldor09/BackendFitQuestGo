@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
 import {IsDate,IsEmail,IsEnum,IsNotEmpty,IsOptional,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
 import {
   MAX_NOMBRE_USUARIO,
@@ -35,6 +36,7 @@ export class CreateUserDto {
   // Solo lo setea AuthService.registrar() con la fecha del momento; un admin
   // creando una cuenta desde el panel no lo envia (queda NULL).
   @IsOptional()
+  @Type(() => Date)
   @IsDate()
   terminosAceptadosEn?: Date;
 }
