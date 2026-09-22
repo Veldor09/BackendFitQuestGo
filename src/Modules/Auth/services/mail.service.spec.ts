@@ -2,9 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthConfig } from '../auth.config';
 import { MailService } from './mail.service';
 
-const sendMailMock = jest.fn().mockResolvedValue(undefined);
+const sendMailMock = jest
+  .fn<Promise<void>, [Record<string, unknown>]>()
+  .mockResolvedValue(undefined);
 const createTransportMock = jest
-  .fn()
+  .fn<{ sendMail: typeof sendMailMock }, unknown[]>()
   .mockReturnValue({ sendMail: sendMailMock });
 
 jest.mock('nodemailer', () => ({
