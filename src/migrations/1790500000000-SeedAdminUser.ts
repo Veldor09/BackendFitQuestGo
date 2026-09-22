@@ -1,9 +1,9 @@
-import {MigrationInterface,QueryRunner,} from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 // Cuenta administrativa para usar
-  //  correo:      admin@gmail.com
-    //contrasena:  admin123
- 
+//  correo:      admin@gmail.com
+//contrasena:  admin123
+
 export class SeedAdminUser1790500000000 implements MigrationInterface {
   name = 'SeedAdminUser1790500000000';
 

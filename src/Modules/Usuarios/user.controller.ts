@@ -1,5 +1,16 @@
-import {Body,Controller,ForbiddenException,Get,Param,ParseIntPipe,Patch,Post,Put,UseGuards,} from '@nestjs/common';
-import {CambiarEstadoDto,CreateUserDto,UpdateUserDto,} from './dto/UserDTO';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { CambiarEstadoDto, CreateUserDto, UpdateUserDto } from './dto/UserDTO';
 import { EstadoUsuario } from './estado.enum';
 import { User } from './user.entity';
 import { UserService } from './user.service';
@@ -43,9 +54,7 @@ export class UserController {
       dto.idrol !== undefined &&
       dto.idrol !== RoleId.Admin
     ) {
-      throw new ForbiddenException(
-        'No puedes quitarte tu propio rol de Admin',
-      );
+      throw new ForbiddenException('No puedes quitarte tu propio rol de Admin');
     }
     return this.userService.updateUser(id, dto);
   }

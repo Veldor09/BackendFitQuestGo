@@ -1,8 +1,12 @@
-import {ConflictException,Injectable,NotFoundException,} from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {QueryFailedError,Repository,} from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { ContrasenasServicio } from '../Auth/services/contrasenas.service';
-import {CreateUserDto,UpdateUserDto,} from './dto/UserDTO';
+import { CreateUserDto, UpdateUserDto } from './dto/UserDTO';
 import { EstadoUsuario } from './estado.enum';
 import { Role } from './roles.entity';
 import { User } from './user.entity';
@@ -13,7 +17,6 @@ const PG_FOREIGN_KEY_VIOLATION = '23503';
 @Injectable()
 export class UserService {
   constructor(
-
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
@@ -38,7 +41,9 @@ export class UserService {
   async createUser(dto: CreateUserDto): Promise<User> {
     const user = this.userRepository.create(dto);
     // `passwordUserHash` llega en texto plano desde el DTO; aqui se hashea.
-    user.passwordUserHash = await this.contrasenas.hashear(dto.passwordUserHash);
+    user.passwordUserHash = await this.contrasenas.hashear(
+      dto.passwordUserHash,
+    );
     user.rol = await this.getRole(dto.idrol);
     return this.save(user);
   }
@@ -66,7 +71,6 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-  
   private async getRole(idrol: number): Promise<Role> {
     const rol = await this.roleRepository.findOneBy({ idrol });
     if (!rol) {

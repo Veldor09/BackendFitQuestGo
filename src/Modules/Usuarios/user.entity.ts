@@ -1,11 +1,17 @@
 import { Exclude } from 'class-transformer';
-import {Column,Entity,JoinColumn,ManyToOne,OneToMany,PrimaryGeneratedColumn,} from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Auth } from '../Auth/auth.entity';
 import { EstadoUsuario } from './estado.enum';
 import { Role } from './roles.entity';
 
 @Entity('usuarios')
-
 export class User {
   @PrimaryGeneratedColumn()
   id: number;

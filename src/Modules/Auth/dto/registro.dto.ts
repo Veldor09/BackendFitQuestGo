@@ -1,4 +1,13 @@
-import {Equals,IsBoolean,IsEmail,IsNotEmpty,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
+import {
+  Equals,
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import {
   MAX_NOMBRE_USUARIO,
   MENSAJE_NOMBRE_INVALIDO,
