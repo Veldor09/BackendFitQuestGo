@@ -51,6 +51,7 @@ export class AuthService {
       emailUser: dto.email,
       passwordUserHash: dto.contrasena,
       idrol: RoleId.UserNormal,
+      terminosAceptadosEn: new Date(),
     });
     return this.emitirSesion(usuario, datos);
   }

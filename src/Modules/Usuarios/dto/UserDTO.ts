@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import {IsEmail,IsEnum,IsNotEmpty,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
+import {IsDate,IsEmail,IsEnum,IsNotEmpty,IsOptional,IsString,Matches,MaxLength,MinLength,} from 'class-validator';
 import {
   MAX_NOMBRE_USUARIO,
   MENSAJE_NOMBRE_INVALIDO,
@@ -31,6 +31,12 @@ export class CreateUserDto {
     message: 'El rol debe ser Usuario (1), Empresa (2) o Admin (3)',
   })
   idrol: RoleId;
+
+  // Solo lo setea AuthService.registrar() con la fecha del momento; un admin
+  // creando una cuenta desde el panel no lo envia (queda NULL).
+  @IsOptional()
+  @IsDate()
+  terminosAceptadosEn?: Date;
 }
 
 // Todos los campos de CreateUserDto pero opcionales, conservando sus validaciones.
