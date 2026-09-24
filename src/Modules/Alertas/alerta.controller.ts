@@ -31,6 +31,11 @@ import { CambiarEstadoAlertaDto, CrearAlertaDto } from './dto/AlertaDTO';
 export class AlertaController {
   constructor(private readonly alertaService: AlertaService) {}
 
+  @Get('mias')
+  findMisAlertas(@UsuarioActual() actual: UsuarioAutenticado): Promise<Alerta[]> {
+    return this.alertaService.findMisAlertas(actual.id);
+  }
+
   @Get()
   findActivas(): Promise<Alerta[]> {
     return this.alertaService.findActivas();

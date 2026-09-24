@@ -21,6 +21,13 @@ export class AlertaService {
    * (ADM-06) por igual. A diferencia de Nodos, una alerta no pasa por cola de
    * aprobacion: se publica de inmediato (ALR-03) por ser de seguridad.
    */
+  findMisAlertas(usuarioId: number): Promise<Alerta[]> {
+    return this.alertaRepository.find({
+      where: { creadoPor: { id: usuarioId } },
+      order: { creadoEn: 'DESC' },
+    });
+  }
+
   findActivas(): Promise<Alerta[]> {
     return this.alertaRepository.find({
       where: { estado: EstadoAlerta.Activa, expiraEn: MoreThan(new Date()) },

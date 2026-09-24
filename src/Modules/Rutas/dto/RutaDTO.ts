@@ -48,6 +48,10 @@ export class CrearRutaDto {
   @ValidateNested({ each: true })
   @Type(() => PuntoRutaDto)
   puntos: PuntoRutaDto[];
+
+  @IsOptional()
+  @IsString()
+  visibilidad?: string;
 }
 
 export class CambiarEstadoRutaDto {

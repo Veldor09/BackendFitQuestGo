@@ -23,21 +23,34 @@ import { RoleId } from './roles.enum';
 
 @Controller('usuarios')
 @UseGuards(GuardiaJwt, GuardiaRoles)
-@Roles(RoleId.Admin)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
+  @Roles(RoleId.Admin)
   findAll(): Promise<User[]> {
     return this.userService.findAll();
   }
 
+  /** PRF-01 / BDG-01 / NAV-07: Metricas del usuario autenticado. */
+  @Get('yo/estadisticas')
+  estadisticasMias(@UsuarioActual() actual: UsuarioAutenticado) {
+    return this.userService.estadisticas(actual.id);
+  }
+
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<User> {
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<User> {
+    if (actual.rol !== RoleId.Admin && actual.id !== id) {
+      throw new ForbiddenException('No tienes permiso para ver este usuario');
+    }
     return this.userService.findOneUser(id);
   }
 
   @Post()
+  @Roles(RoleId.Admin)
   create(@Body() dto: CreateUserDto): Promise<User> {
     return this.userService.createUser(dto);
   }
@@ -48,6 +61,16 @@ export class UserController {
     @Body() dto: UpdateUserDto,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<User> {
+    const esAdmin = actual.rol === RoleId.Admin;
+    if (!esAdmin && id !== actual.id) {
+      throw new ForbiddenException('No tienes permiso para modificar este usuario');
+    }
+
+    // Un usuario normal no puede cambiarse su propio rol
+    if (!esAdmin && dto.idrol !== undefined) {
+      delete dto.idrol;
+    }
+
     // Un admin no puede quitarse a si mismo el rol de Admin.
     if (
       id === actual.id &&
@@ -61,6 +84,7 @@ export class UserController {
 
   /** Baja / alta logica de una cuenta (antes: DELETE /usuarios/:id). */
   @Patch(':id/estado')
+  @Roles(RoleId.Admin)
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoDto,
@@ -72,4 +96,5 @@ export class UserController {
     }
     return this.userService.cambiarEstado(id, dto.estado);
   }
+
 }
