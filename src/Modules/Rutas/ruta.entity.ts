@@ -6,7 +6,9 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { SoloAutorPublico } from '../../common/autor-publico';
 import { User } from '../Usuarios/user.entity';
+import { ActividadRuta } from './actividad-ruta.enum';
 import { EstadoRuta } from './estado-ruta.enum';
 
 export interface PuntoRuta {
@@ -22,9 +24,10 @@ export class Ruta {
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
 
-  // Texto libre (Ciclismo, Running, Caminata, Hiking, ...).
-  @Column({ type: 'varchar', length: 30 })
-  actividad: string;
+  // Una o varias claves de la lista cerrada `ActividadRuta` (running,
+  // ciclismo, ...). Arreglo nativo de Postgres: `text[]`.
+  @Column({ type: 'text', array: true })
+  actividades: ActividadRuta[];
 
   @Column({ type: 'varchar', length: 20, default: 'moderada' })
   dificultad: string;
@@ -42,6 +45,10 @@ export class Ruta {
   @Column({ type: 'varchar', length: 20, default: 'privada' })
   visibilidad: string;
 
+  @SoloAutorPublico()
+  @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'creado_por' })
+  creadoPor: User;
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
   creadoPor: User;

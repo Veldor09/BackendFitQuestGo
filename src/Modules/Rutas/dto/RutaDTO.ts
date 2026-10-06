@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsEnum,
   IsLatitude,
@@ -13,6 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ActividadRuta } from '../actividad-ruta.enum';
 import { EstadoRuta } from '../estado-ruta.enum';
 
 export class PuntoRutaDto {
@@ -29,10 +31,14 @@ export class CrearRutaDto {
   @MaxLength(100, { message: 'El nombre admite maximo 100 caracteres' })
   nombre: string;
 
-  @IsString()
-  @IsNotEmpty({ message: 'La actividad es obligatoria' })
-  @MaxLength(30, { message: 'La actividad admite maximo 30 caracteres' })
-  actividad: string;
+  @IsArray({ message: 'Las actividades deben ser una lista' })
+  @ArrayMinSize(1, { message: 'Elegi al menos una actividad' })
+  @ArrayUnique({ message: 'No repitas actividades' })
+  @IsEnum(ActividadRuta, {
+    each: true,
+    message: 'Alguna actividad no es valida',
+  })
+  actividades: ActividadRuta[];
 
   @IsOptional()
   @IsString()
