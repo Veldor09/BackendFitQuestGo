@@ -1,0 +1,35 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: fitquestgo-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    # Rama que se despliega. Cada push a ella publica una version nueva.
+    branch: Developer
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: DB_SSL
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: JWT_ACCESS_TTL
+        value: "900"
+      - key: REFRESH_TTL_DIAS
+        value: "7"
+      # Secretos: se piden en el panel de Render al crear el servicio.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: FRONT_URL
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false

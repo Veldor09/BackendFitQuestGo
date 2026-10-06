@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Put,
   Req,
   Res,
   UnauthorizedException,
@@ -20,6 +21,7 @@ import { InicioSesionDto } from './dto/inicio-sesion.dto';
 import { RenovarDto } from './dto/renovar.dto';
 import { OlvideContrasenaDto } from './dto/olvide-contrasena.dto';
 import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
+import { UpdateUserDto } from '../Usuarios/dto/UserDTO';
 import { GuardiaJwt } from './guards/jwt.guard';
 import { UsuarioActual } from './decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from './types/carga-jwt';
@@ -122,6 +124,16 @@ export class AuthController {
   @UseGuards(GuardiaJwt)
   perfil(@UsuarioActual() usuario: UsuarioAutenticado): Promise<User> {
     return this.authService.obtenerPerfil(usuario.id);
+  }
+
+  @Put('perfil')
+  @UseGuards(GuardiaJwt)
+  actualizarPerfil(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Body() dto: UpdateUserDto,
+  ): Promise<User> {
+    const { idrol, terminosAceptadosEn, ...cambiosPermitidos } = dto;
+    return this.authService.actualizarPerfil(usuario.id, cambiosPermitidos);
   }
 
   @Post('olvide-contrasena')

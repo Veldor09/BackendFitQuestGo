@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDate,
   IsEmail,
   IsEnum,
@@ -49,6 +50,26 @@ export class CreateUserDto {
   @Type(() => Date)
   @IsDate()
   terminosAceptadosEn?: Date;
+
+  @IsOptional()
+  @IsArray({ message: 'intereses debe ser un arreglo de textos' })
+  @IsString({ each: true, message: 'Cada interes debe ser texto' })
+  intereses?: string[];
+
+  @IsArray({ message: 'Las actividades deben ser una lista' })
+  @IsString({ each: true, message: 'Cada actividad debe ser un texto' })
+  @IsOptional()
+  actividades?: string[];
+  @IsOptional()
+  @IsString()
+  unidad?: string;
+
+  @IsOptional()
+  notificaciones?: boolean;
+
+  @IsOptional()
+  @IsString()
+  visibilidad?: string;
 }
 
 // Todos los campos de CreateUserDto pero opcionales, conservando sus validaciones.

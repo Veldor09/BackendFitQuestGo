@@ -50,6 +50,13 @@ export class AlertaService {
    * `Expirada` en la base lo hace `AlertaExpiracionTask`, hasta un minuto
    * despues (ver `expirarVencidas`).
    */
+  findMisAlertas(usuarioId: number): Promise<Alerta[]> {
+    return this.alertaRepository.find({
+      where: { creadoPor: { id: usuarioId } },
+      order: { creadoEn: 'DESC' },
+    });
+  }
+
   async findActivas(usuarioId: number): Promise<AlertaConVoto[]> {
     const alertas = await this.alertaRepository.find({
       where: { estado: EstadoAlerta.Activa, expiraEn: MoreThan(new Date()) },

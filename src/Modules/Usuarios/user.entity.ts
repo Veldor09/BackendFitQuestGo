@@ -35,6 +35,21 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   terminosAceptadosEn: Date | null;
 
+  @Column({ type: 'text', array: true, default: '{}' })
+  intereses: string[];
+
+  @Column({ type: 'text', array: true, default: '{}' })
+  actividades: string[];
+
+  @Column({ type: 'varchar', length: 3, default: 'km' })
+  unidad: string;
+
+  @Column({ type: 'boolean', default: true })
+  notificaciones: boolean;
+
+  @Column({ type: 'varchar', length: 10, default: 'publico' })
+  visibilidad: string;
+
   @ManyToOne(() => Role, (role) => role.usuarios, {
     eager: true,
     nullable: false,

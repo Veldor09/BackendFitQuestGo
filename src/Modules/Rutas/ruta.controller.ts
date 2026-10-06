@@ -33,6 +33,29 @@ export class RutaController {
     return this.rutaService.findMisRutas(actual.id);
   }
 
+  /** Rutas guardadas / favoritas del usuario (RTE-03). */
+  @Get('favoritas')
+  findFavoritas(@UsuarioActual() actual: UsuarioAutenticado): Promise<Ruta[]> {
+    return this.rutaService.findFavoritas(actual.id);
+  }
+
+  /** Lista de IDs de rutas favoritas para la UI. */
+  @Get('favoritas/ids')
+  findFavoritasIds(
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<number[]> {
+    return this.rutaService.findFavoritasIds(actual.id);
+  }
+
+  /** Alternar favorita (guardar/remover). */
+  @Post(':id/favorita')
+  toggleFavorita(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<{ favorita: boolean }> {
+    return this.rutaService.toggleFavorita(id, actual.id);
+  }
+
   @Get('pendientes')
   @UseGuards(GuardiaRoles)
   @Roles(RoleId.Admin)

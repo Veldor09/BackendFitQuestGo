@@ -42,7 +42,13 @@ export class Ruta {
   @Column({ type: 'varchar', length: 20, default: EstadoRuta.Privada })
   estado: EstadoRuta;
 
+  @Column({ type: 'varchar', length: 20, default: 'privada' })
+  visibilidad: string;
+
   @SoloAutorPublico()
+  @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'creado_por' })
+  creadoPor: User;
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
   creadoPor: User;

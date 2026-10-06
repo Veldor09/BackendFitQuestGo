@@ -13,6 +13,7 @@ import { RestablecimientoContrasena } from './entities/restablecimiento-contrase
 import { RegistroDto } from './dto/registro.dto';
 import { InicioSesionDto } from './dto/inicio-sesion.dto';
 import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
+import { UpdateUserDto } from '../Usuarios/dto/UserDTO';
 
 interface DatosCliente {
   agenteUsuario?: string | null;
@@ -63,6 +64,8 @@ export class AuthService {
       passwordUserHash: dto.contrasena,
       idrol: RoleId.UserNormal,
       terminosAceptadosEn: new Date(),
+      intereses: dto.intereses ?? [],
+      actividades: dto.actividades ?? [],
     });
     return this.emitirSesion(usuario, datos);
   }
@@ -119,6 +122,10 @@ export class AuthService {
 
   obtenerPerfil(usuarioId: number): Promise<User> {
     return this.userService.findOneUser(usuarioId);
+  }
+
+  actualizarPerfil(usuarioId: number, dto: UpdateUserDto): Promise<User> {
+    return this.userService.updateUser(usuarioId, dto);
   }
 
   async cerrarSesion(refreshTokenPlano: string | undefined): Promise<void> {

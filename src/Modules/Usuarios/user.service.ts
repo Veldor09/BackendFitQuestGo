@@ -97,4 +97,21 @@ export class UserService {
       throw error;
     }
   }
+  async estadisticas(id: number): Promise<{ kmRecorridos: number; rutasCompletadas: number; insignias: number }> {
+    await this.findOneUser(id);
+    const result: any[] = await this.userRepository.manager.query(
+      'SELECT COALESCE(SUM(CAST(r."distancia_km" AS float)), 0) AS km, COUNT(r.id)::int AS rutas FROM rutas r WHERE r.creado_por = $1 AND r.estado != $2',
+      [id, 'Rechazada'],
+    );
+    const km = parseFloat(result[0]?.km ?? '0');
+    const rutas = parseInt(result[0]?.rutas ?? '0', 10);
+    let insignias = 0;
+    if (rutas >= 1) insignias++;
+    if (rutas >= 5) insignias++;
+    if (rutas >= 10) insignias++;
+    if (km >= 100) insignias++;
+    if (km >= 500) insignias++;
+    return { kmRecorridos: Math.round(km * 10) / 10, rutasCompletadas: rutas, insignias };
+  }
+
 }

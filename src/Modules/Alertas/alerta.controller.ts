@@ -35,6 +35,11 @@ import {
 export class AlertaController {
   constructor(private readonly alertaService: AlertaService) {}
 
+  @Get('mias')
+  findMisAlertas(@UsuarioActual() actual: UsuarioAutenticado): Promise<Alerta[]> {
+    return this.alertaService.findMisAlertas(actual.id);
+  }
+
   @Get()
   findActivas(
     @UsuarioActual() actual: UsuarioAutenticado,
