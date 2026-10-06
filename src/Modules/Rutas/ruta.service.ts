@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { esAdmin } from '../Auth/es-admin';
+import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { CrearRutaDto } from './dto/RutaDTO';
 import { EstadoRuta } from './estado-ruta.enum';
 import { Ruta } from './ruta.entity';
@@ -50,6 +52,24 @@ export class RutaService {
   async findOne(id: number): Promise<Ruta> {
     const ruta = await this.rutaRepository.findOne({ where: { id } });
     if (!ruta) {
+      throw new NotFoundException(`Ruta ${id} no encontrada`);
+    }
+    return ruta;
+  }
+
+  /**
+   * Una ruta por su id. Una publicada la ve cualquiera; una privada, pendiente
+   * o rechazada solo quien la creo y el admin (que la revisa): su trazo puede
+   * mostrar de donde sale y adonde llega alguien. Para el resto responde 404,
+   * igual que si no existiera.
+   */
+  async verRuta(id: number, actual: UsuarioAutenticado): Promise<Ruta> {
+    const ruta = await this.findOne(id);
+    const puedeVer =
+      ruta.estado === EstadoRuta.Publicada ||
+      ruta.creadoPor.id === actual.id ||
+      esAdmin(actual);
+    if (!puedeVer) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
     }
     return ruta;

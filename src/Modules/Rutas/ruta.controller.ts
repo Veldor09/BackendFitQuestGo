@@ -40,9 +40,13 @@ export class RutaController {
     return this.rutaService.findPendientes();
   }
 
+  /** Una ruta publicada la ve cualquiera; el resto, solo su dueno y el admin. */
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Ruta> {
-    return this.rutaService.findOne(id);
+  verRuta(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
+    return this.rutaService.verRuta(id, actual);
   }
 
   /** Planificar/registrar una ruta (RTE-06/07): cualquier usuario autenticado. */
