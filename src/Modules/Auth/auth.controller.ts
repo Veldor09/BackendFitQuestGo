@@ -17,6 +17,7 @@ import { AuthConfig } from './auth.config';
 import { AuthService } from './auth.service';
 import type { ResultadoAuth } from './auth.service';
 import { RegistroDto } from './dto/registro.dto';
+import { RegistroEmpresaDto } from './dto/registro-empresa.dto';
 import { InicioSesionDto } from './dto/inicio-sesion.dto';
 import { RenovarDto } from './dto/renovar.dto';
 import { OlvideContrasenaDto } from './dto/olvide-contrasena.dto';
@@ -46,6 +47,21 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const resultado = await this.authService.registrar(
+      dto,
+      this.datosCliente(req),
+    );
+    this.escribirCookies(res, resultado);
+    return this.cuerpoRespuesta(req, resultado);
+  }
+
+  @Post('registro-empresa')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async registroEmpresa(
+    @Body() dto: RegistroEmpresaDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const resultado = await this.authService.registrarEmpresa(
       dto,
       this.datosCliente(req),
     );

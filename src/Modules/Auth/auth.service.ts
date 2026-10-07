@@ -11,6 +11,7 @@ import { TokensServicio } from './services/tokens.service';
 import { MailService } from './services/mail.service';
 import { RestablecimientoContrasena } from './entities/restablecimiento-contrasena.entity';
 import { RegistroDto } from './dto/registro.dto';
+import { RegistroEmpresaDto } from './dto/registro-empresa.dto';
 import { InicioSesionDto } from './dto/inicio-sesion.dto';
 import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
 import { UpdateUserDto } from '../Usuarios/dto/UserDTO';
@@ -66,6 +67,22 @@ export class AuthService {
       terminosAceptadosEn: new Date(),
       intereses: dto.intereses ?? [],
       actividades: dto.actividades ?? [],
+    });
+    return this.emitirSesion(usuario, datos);
+  }
+
+  /** Cuenta Empresa: mismo flujo que `registrar`, pero con rol Empresa. */
+  async registrarEmpresa(
+    dto: RegistroEmpresaDto,
+    datos: DatosCliente,
+  ): Promise<ResultadoAuth> {
+    const usuario = await this.userService.createUser({
+      nombreUser: dto.nombreComercial.trim(),
+      emailUser: dto.email,
+      passwordUserHash: dto.contrasena,
+      idrol: RoleId.Empresa,
+      terminosAceptadosEn: new Date(),
+      telefono: dto.telefono,
     });
     return this.emitirSesion(usuario, datos);
   }

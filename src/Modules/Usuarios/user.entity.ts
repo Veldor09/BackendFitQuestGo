@@ -50,6 +50,10 @@ export class User {
   @Column({ type: 'varchar', length: 10, default: 'publico' })
   visibilidad: string;
 
+  // Contacto de la cuenta Empresa. Los deportistas no lo usan (queda NULL).
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  telefono: string | null;
+
   @ManyToOne(() => Role, (role) => role.usuarios, {
     eager: true,
     nullable: false,

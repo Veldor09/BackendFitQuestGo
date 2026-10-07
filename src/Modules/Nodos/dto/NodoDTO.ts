@@ -45,6 +45,12 @@ export class CrearNodoDto {
   @IsString()
   @MaxLength(500, { message: 'La descripcion admite maximo 500 caracteres' })
   descripcion?: string;
+
+  /** Cupon o beneficio: solo lo guardan las cuentas Empresa (modulo 5). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300, { message: 'El beneficio admite maximo 300 caracteres' })
+  beneficio?: string;
 }
 
 export class ActualizarNodoDto extends PartialType(CrearNodoDto) {}

@@ -13,9 +13,10 @@ import { esViolacionDeUnicidad } from '../../common/postgres';
 import { RADIO_VOTO_METROS } from '../../common/votacion';
 import { esAdmin } from '../Auth/es-admin';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { RoleId } from '../Usuarios/roles.enum';
 import type { User } from '../Usuarios/user.entity';
 import { CategoriaNodo } from './categoria-nodo.enum';
-import { CrearNodoDto, VotarNodoDto } from './dto/NodoDTO';
+import { ActualizarNodoDto, CrearNodoDto, VotarNodoDto } from './dto/NodoDTO';
 import { EstadoNodo, TipoVotoNodo, UMBRAL_OBSOLETO } from './estado-nodo.enum';
 import { detectarTipoImagen, MAX_FOTO_BYTES, TipoImagen } from './imagen.util';
 import { NodoFoto } from './nodo-foto.entity';
@@ -114,7 +115,13 @@ export class NodoService {
     return nodo;
   }
 
-  create(dto: CrearNodoDto, usuarioId: number): Promise<Nodo> {
+  /**
+   * Una persona propone un punto y espera la aprobacion de un admin. Una cuenta
+   * Empresa publica un Nodo de Abastecimiento: sale al mapa de inmediato, con
+   * su beneficio y la marca de patrocinado.
+   */
+  create(dto: CrearNodoDto, usuarioId: number, rol?: number): Promise<Nodo> {
+    const esEmpresa = rol === Number(RoleId.Empresa);
     const nodo = this.nodoRepository.create({
       ...dto,
       // El texto libre solo tiene sentido con la categoria "otro".
@@ -122,10 +129,55 @@ export class NodoService {
         dto.categoria === CategoriaNodo.Otro
           ? (dto.categoriaOtro ?? null)
           : null,
-      estado: EstadoNodo.Pendiente,
+      beneficio: esEmpresa ? this.limpiarBeneficio(dto.beneficio) : null,
+      patrocinado: esEmpresa,
+      estado: esEmpresa ? EstadoNodo.Aprobado : EstadoNodo.Pendiente,
       creadoPor: { id: usuarioId },
     });
     return this.nodoRepository.save(nodo);
+  }
+
+  /** Edita un nodo propio. Solo cuentas Empresa sobre sus nodos patrocinados. */
+  async actualizar(
+    id: number,
+    dto: ActualizarNodoDto,
+    actual: UsuarioAutenticado,
+  ): Promise<Nodo> {
+    const nodo = await this.findOne(id);
+    if (!nodo.patrocinado || nodo.creadoPor.id !== actual.id) {
+      throw new ForbiddenException('Este nodo no te pertenece');
+    }
+    if (dto.nombre !== undefined) nodo.nombre = dto.nombre;
+    if (dto.categoria !== undefined) nodo.categoria = dto.categoria;
+    if (dto.lat !== undefined) nodo.lat = dto.lat;
+    if (dto.lng !== undefined) nodo.lng = dto.lng;
+    if (dto.descripcion !== undefined) {
+      nodo.descripcion = dto.descripcion.trim() || null;
+    }
+    if (dto.beneficio !== undefined) {
+      nodo.beneficio = this.limpiarBeneficio(dto.beneficio);
+    }
+    if (dto.categoria !== undefined || dto.categoriaOtro !== undefined) {
+      nodo.categoriaOtro =
+        nodo.categoria === CategoriaNodo.Otro
+          ? (dto.categoriaOtro ?? nodo.categoriaOtro ?? null)
+          : null;
+    }
+    return this.nodoRepository.save(nodo);
+  }
+
+  /** Baja de un nodo patrocinado: su empresa o un admin. */
+  async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
+    const nodo = await this.findOne(id);
+    const esSuyo = nodo.patrocinado && nodo.creadoPor.id === actual.id;
+    if (!esSuyo && !esAdmin(actual)) {
+      throw new ForbiddenException('Este nodo no te pertenece');
+    }
+    await this.nodoRepository.remove(nodo);
+  }
+
+  private limpiarBeneficio(beneficio?: string): string | null {
+    return beneficio?.trim() || null;
   }
 
   async cambiarEstado(id: number, estado: EstadoNodo): Promise<Nodo> {

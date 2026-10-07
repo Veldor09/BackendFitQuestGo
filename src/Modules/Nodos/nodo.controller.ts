@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -24,6 +25,7 @@ import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from '../Usuarios/roles.enum';
 import {
+  ActualizarNodoDto,
   CambiarEstadoNodoDto,
   CrearNodoDto,
   VotarNodoDto,
@@ -71,7 +73,29 @@ export class NodoController {
     @Body() dto: CrearNodoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<Nodo> {
-    return this.nodoService.create(dto, actual.id);
+    return this.nodoService.create(dto, actual.id, actual.rol);
+  }
+
+  /** Editar un Nodo de Abastecimiento propio (modulo 5). */
+  @Patch(':id')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Empresa)
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarNodoDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Nodo> {
+    return this.nodoService.actualizar(id, dto, actual);
+  }
+
+  /** Dar de baja un Nodo de Abastecimiento: su empresa o un admin. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  eliminar(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<void> {
+    return this.nodoService.eliminar(id, actual);
   }
 
   /**

@@ -9,6 +9,7 @@ import { opcionesConexion } from './db-options';
 import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
 import { ClimaModule } from './Modules/Clima/clima.module';
+import { EventoModule } from './Modules/Eventos/evento.module';
 import { NodoModule } from './Modules/Nodos/nodo.module';
 import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
@@ -38,6 +39,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     RutaModule,
     AlertaModule,
     ClimaModule,
+    EventoModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

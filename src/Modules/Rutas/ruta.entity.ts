@@ -49,9 +49,6 @@ export class Ruta {
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
   creadoPor: User;
-  @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creado_por' })
-  creadoPor: User;
 
   // `timestamptz` explicito: ver nota en Nodo.creadoEn sobre por que el tipo
   // `timestamp` por defecto desfasa la hora al leerla de vuelta.
