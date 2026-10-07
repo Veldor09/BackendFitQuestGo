@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
+import { InsigniasService } from '../Insignias/insignias.service';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { CrearAlertaDto } from './dto/AlertaDTO';
 import { Alerta } from './alerta.entity';
 import {
@@ -11,10 +17,35 @@ import {
 
 @Injectable()
 export class AlertaService {
+  private readonly logger = new Logger(AlertaService.name);
+
   constructor(
     @InjectRepository(Alerta)
     private readonly alertaRepository: Repository<Alerta>,
+    private readonly insigniasService: InsigniasService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
+
+  /**
+   * Punto encapsulado para notificar al autor cuando su alerta pasa a publicada / activa.
+   */
+  async notificarAlertaPublicada(alerta: Alerta): Promise<void> {
+    if (!alerta.creadoPor?.id) return;
+    try {
+      await this.notificacionesService.crear({
+        idUsuario: alerta.creadoPor.id,
+        categoria: CategoriaNotificacion.Alertas,
+        titulo: 'Tu alerta fue publicada',
+        mensaje: 'Tu reporte ya es visible para la comunidad.',
+        referenciaTipo: ReferenciaTipoNotificacion.Alerta,
+        referenciaId: alerta.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error al notificar alerta publicada ${alerta.id}: ${error.message}`,
+      );
+    }
+  }
 
   /**
    * Alertas vigentes: para el mapa (HOM-01) y para la supervision del admin
@@ -43,7 +74,7 @@ export class AlertaService {
     return alerta;
   }
 
-  create(dto: CrearAlertaDto, usuarioId: number): Promise<Alerta> {
+  async create(dto: CrearAlertaDto, usuarioId: number): Promise<Alerta> {
     const horas = TTL_HORAS_POR_GRAVEDAD[dto.gravedad];
     const expiraEn = new Date(Date.now() + horas * 60 * 60 * 1000);
     const alerta = this.alertaRepository.create({
@@ -53,7 +84,18 @@ export class AlertaService {
       creadoPor: { id: usuarioId },
       expiraEn,
     });
-    return this.alertaRepository.save(alerta);
+    const guardada = await this.alertaRepository.save(alerta);
+
+    // Evaluar insignia PRIMERA_ALERTA
+    try {
+      await this.insigniasService.evaluar(usuarioId);
+    } catch (error) {
+      this.logger.error(
+        `Error al evaluar insignias tras crear alerta para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    return guardada;
   }
 
   /** ALR-04 "Confirmar": alguien la ve vigente, se reinicia el contador de dudas. */

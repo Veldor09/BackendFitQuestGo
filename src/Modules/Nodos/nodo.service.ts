@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InsigniasService } from '../Insignias/insignias.service';
 import { CrearNodoDto } from './dto/NodoDTO';
 import { EstadoNodo } from './estado-nodo.enum';
 import { Nodo } from './nodo.entity';
 
 @Injectable()
 export class NodoService {
+  private readonly logger = new Logger(NodoService.name);
+
   constructor(
     @InjectRepository(Nodo)
     private readonly nodoRepository: Repository<Nodo>,
+    private readonly insigniasService: InsigniasService,
   ) {}
 
   /**
@@ -51,13 +55,24 @@ export class NodoService {
     return nodo;
   }
 
-  create(dto: CrearNodoDto, usuarioId: number): Promise<Nodo> {
+  async create(dto: CrearNodoDto, usuarioId: number): Promise<Nodo> {
     const nodo = this.nodoRepository.create({
       ...dto,
       estado: EstadoNodo.Pendiente,
       creadoPor: { id: usuarioId },
     });
-    return this.nodoRepository.save(nodo);
+    const guardado = await this.nodoRepository.save(nodo);
+
+    // Evaluar insignia PRIMER_PUNTO_INTERES
+    try {
+      await this.insigniasService.evaluar(usuarioId);
+    } catch (error) {
+      this.logger.error(
+        `Error al evaluar insignias tras crear nodo para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    return guardado;
   }
 
   async cambiarEstado(id: number, estado: EstadoNodo): Promise<Nodo> {

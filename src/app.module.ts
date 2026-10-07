@@ -6,7 +6,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
+import { InsigniasModule } from './Modules/Insignias/insignias.module';
 import { NodoModule } from './Modules/Nodos/nodo.module';
+import { NotificacionesModule } from './Modules/Notificaciones/notificaciones.module';
 import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
@@ -36,6 +38,8 @@ import { UserModule } from './Modules/Usuarios/user.module';
     NodoModule,
     RutaModule,
     AlertaModule,
+    NotificacionesModule,
+    InsigniasModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

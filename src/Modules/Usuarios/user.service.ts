@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { ContrasenasServicio } from '../Auth/services/contrasenas.service';
+import { InsigniasService } from '../Insignias/insignias.service';
 import { CreateUserDto, UpdateUserDto } from './dto/UserDTO';
 import { EstadoUsuario } from './estado.enum';
 import { Role } from './roles.entity';
@@ -22,6 +23,7 @@ export class UserService {
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
     private readonly contrasenas: ContrasenasServicio,
+    private readonly insigniasService: InsigniasService,
   ) {}
 
   findAll(): Promise<User[]> {
@@ -105,12 +107,7 @@ export class UserService {
     );
     const km = parseFloat(result[0]?.km ?? '0');
     const rutas = parseInt(result[0]?.rutas ?? '0', 10);
-    let insignias = 0;
-    if (rutas >= 1) insignias++;
-    if (rutas >= 5) insignias++;
-    if (rutas >= 10) insignias++;
-    if (km >= 100) insignias++;
-    if (km >= 500) insignias++;
+    const insignias = await this.insigniasService.contarInsigniasUsuario(id);
     return { kmRecorridos: Math.round(km * 10) / 10, rutasCompletadas: rutas, insignias };
   }
 
