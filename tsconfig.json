@@ -15,6 +15,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "incremental": true,
+    // Dentro de dist para que el deleteOutDir de nest-cli.json lo borre junto
+    // con la carpeta. Si queda fuera, tsc cree que ya compilo y no emite nada.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
