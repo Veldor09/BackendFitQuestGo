@@ -12,6 +12,7 @@ import { distanciaMetros } from '../../common/distancia.util';
 import { esViolacionDeUnicidad } from '../../common/postgres';
 import { RADIO_VOTO_METROS } from '../../common/votacion';
 import { esAdmin } from '../Auth/es-admin';
+import { esEmpresa, puedeVerContenidoDe } from '../Auth/es-empresa';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from '../Usuarios/roles.enum';
 import type { User } from '../Usuarios/user.entity';
@@ -69,14 +70,22 @@ export class NodoService {
    * propuso a cualquiera que mire el mapa. Cada uno trae el recuento de votos
    * y `miVoto`, para que la app no le vuelva a pedir el voto a quien ya votó.
    */
-  async findAprobados(usuarioId: number): Promise<NodoConVotos[]> {
-    const nodos = await this.nodoRepository
+  async findAprobados(
+    usuarioId: number,
+    rol?: number,
+  ): Promise<NodoConVotos[]> {
+    const consulta = this.nodoRepository
       .createQueryBuilder('nodo')
       .leftJoin('nodo.creadoPor', 'creadoPor')
       .addSelect(['creadoPor.id', 'creadoPor.nombreUser'])
-      .where('nodo.estado = :estado', { estado: EstadoNodo.Aprobado })
-      .orderBy('nodo.id', 'DESC')
-      .getMany();
+      .where('nodo.estado = :estado', { estado: EstadoNodo.Aprobado });
+    // Una empresa solo ve los nodos de empresas, no los de los deportistas.
+    if (rol !== undefined && esEmpresa({ rol })) {
+      consulta.andWhere('creadoPor.idrol = :rolEmpresa', {
+        rolEmpresa: RoleId.Empresa,
+      });
+    }
+    const nodos = await consulta.orderBy('nodo.id', 'DESC').getMany();
     if (nodos.length === 0) {
       return [];
     }
@@ -116,9 +125,23 @@ export class NodoService {
   }
 
   /**
-   * Una persona propone un punto y espera la aprobacion de un admin. Una cuenta
-   * Empresa publica un Nodo de Abastecimiento: sale al mapa de inmediato, con
-   * su beneficio y la marca de patrocinado.
+   * Un nodo por su id para quien lo consulta: una empresa no ve los de los
+   * deportistas, y para ella responde 404 igual que si no existiera.
+   */
+  async verNodo(id: number, actual: UsuarioAutenticado): Promise<Nodo> {
+    const nodo = await this.findOne(id);
+    if (!puedeVerContenidoDe(actual, nodo.creadoPor)) {
+      throw new NotFoundException(`Nodo ${id} no encontrado`);
+    }
+    return nodo;
+  }
+
+  /**
+   * Un nodo sale al mapa de inmediato, sin esperar a un admin: lo mismo si lo
+   * crea un deportista (un punto de interes) que una empresa (un Nodo de
+   * Abastecimiento, que ademas lleva su beneficio y la marca de patrocinado).
+   * El admin puede rechazarlo o retirarlo despues, y la comunidad lo puede
+   * votar como obsoleto.
    */
   create(dto: CrearNodoDto, usuarioId: number, rol?: number): Promise<Nodo> {
     const esEmpresa = rol === Number(RoleId.Empresa);
@@ -131,7 +154,7 @@ export class NodoService {
           : null,
       beneficio: esEmpresa ? this.limpiarBeneficio(dto.beneficio) : null,
       patrocinado: esEmpresa,
-      estado: esEmpresa ? EstadoNodo.Aprobado : EstadoNodo.Pendiente,
+      estado: EstadoNodo.Aprobado,
       creadoPor: { id: usuarioId },
     });
     return this.nodoRepository.save(nodo);
@@ -191,8 +214,9 @@ export class NodoService {
     id: number,
     usuarioId: number,
     posicion: VotarNodoDto,
+    rol?: number,
   ): Promise<NodoConVotos> {
-    return this.votar(id, usuarioId, TipoVotoNodo.Confirmar, posicion);
+    return this.votar(id, usuarioId, TipoVotoNodo.Confirmar, posicion, rol);
   }
 
   /**
@@ -204,8 +228,9 @@ export class NodoService {
     id: number,
     usuarioId: number,
     posicion: VotarNodoDto,
+    rol?: number,
   ): Promise<NodoConVotos> {
-    return this.votar(id, usuarioId, TipoVotoNodo.Obsoleto, posicion);
+    return this.votar(id, usuarioId, TipoVotoNodo.Obsoleto, posicion, rol);
   }
 
   /**
@@ -217,8 +242,12 @@ export class NodoService {
     usuarioId: number,
     tipo: TipoVotoNodo,
     posicion: VotarNodoDto,
+    rol?: number,
   ): Promise<NodoConVotos> {
     const nodo = await this.findOne(id);
+    if (rol !== undefined && !puedeVerContenidoDe({ rol }, nodo.creadoPor)) {
+      throw new NotFoundException(`Nodo ${id} no encontrado`);
+    }
     if (nodo.estado !== EstadoNodo.Aprobado) {
       throw new ConflictException('El punto ya no esta en el mapa');
     }
@@ -311,9 +340,10 @@ export class NodoService {
   ): Promise<{ contenido: Buffer; tipoMime: string }> {
     const nodo = await this.findOne(id);
     const puedeVer =
-      nodo.estado === EstadoNodo.Aprobado ||
-      nodo.creadoPor.id === actual.id ||
-      esAdmin(actual);
+      puedeVerContenidoDe(actual, nodo.creadoPor) &&
+      (nodo.estado === EstadoNodo.Aprobado ||
+        nodo.creadoPor.id === actual.id ||
+        esAdmin(actual));
     const foto = puedeVer
       ? await this.fotoRepository.findOne({ where: { nodoId: id } })
       : null;

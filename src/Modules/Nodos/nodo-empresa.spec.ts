@@ -100,14 +100,14 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
       expect(nodos.create.mock.calls[0][0]).toMatchObject({ beneficio: null });
     });
 
-    it('un deportista sigue en Pendiente, sin patrocinio ni beneficio', async () => {
+    it('un deportista tambien publica directo, pero sin patrocinio ni beneficio', async () => {
       await service.create(
         dto({ beneficio: 'me lo invento' }),
         7,
         RoleId.UserNormal,
       );
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
-        estado: EstadoNodo.Pendiente,
+        estado: EstadoNodo.Aprobado,
         patrocinado: false,
         beneficio: null,
       });
@@ -116,7 +116,7 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
     it('sin rol (llamada interna) se trata como deportista', async () => {
       await service.create(dto(), 7);
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
-        estado: EstadoNodo.Pendiente,
+        estado: EstadoNodo.Aprobado,
         patrocinado: false,
       });
     });

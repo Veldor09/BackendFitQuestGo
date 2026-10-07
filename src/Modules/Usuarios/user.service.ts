@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
@@ -9,7 +12,14 @@ import { ContrasenasServicio } from '../Auth/services/contrasenas.service';
 import { CreateUserDto, UpdateUserDto } from './dto/UserDTO';
 import { EstadoUsuario } from './estado.enum';
 import { Role } from './roles.entity';
+import { ActualizarPerfilEmpresaDto } from '../Auth/dto/actualizar-perfil-empresa.dto';
+import {
+  detectarTipoImagen,
+  MAX_FOTO_BYTES,
+} from '../Nodos/imagen.util';
+import { RoleId } from './roles.enum';
 import { User } from './user.entity';
+import { UsuarioFoto } from './usuario-foto.entity';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
@@ -22,6 +32,8 @@ export class UserService {
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
     private readonly contrasenas: ContrasenasServicio,
+    @InjectRepository(UsuarioFoto)
+    private readonly fotoRepository: Repository<UsuarioFoto>,
   ) {}
 
   findAll(): Promise<User[]> {
@@ -59,6 +71,57 @@ export class UserService {
       user.rol = await this.getRole(dto.idrol);
     }
     return this.save(user);
+  }
+
+  /**
+   * Una cuenta Empresa cambia su nombre comercial y su telefono. Lo que no
+   * llega queda como estaba; un telefono vacio lo borra.
+   */
+  async actualizarPerfilEmpresa(
+    id: number,
+    dto: ActualizarPerfilEmpresaDto,
+  ): Promise<User> {
+    const user = await this.findOneUser(id);
+    if (user.idrol !== Number(RoleId.Empresa)) {
+      throw new ForbiddenException('Solo una cuenta de empresa puede hacer esto');
+    }
+    if (dto.nombreComercial !== undefined) {
+      user.nombreUser = dto.nombreComercial.trim();
+    }
+    if (dto.telefono !== undefined) {
+      user.telefono = dto.telefono.trim() || null;
+    }
+    return this.save(user);
+  }
+
+  /** Guarda (o reemplaza) la foto de perfil. Solo JPEG, PNG o WebP de hasta 3 MB. */
+  async guardarFoto(id: number, datos: Buffer): Promise<void> {
+    await this.findOneUser(id);
+    if (datos.length > MAX_FOTO_BYTES) {
+      throw new PayloadTooLargeException(
+        `La foto pesa mas de ${MAX_FOTO_BYTES / (1024 * 1024)} MB`,
+      );
+    }
+    // Se confia en los bytes, no en lo que declare el archivo.
+    const tipoMime = detectarTipoImagen(datos);
+    if (!tipoMime) {
+      throw new BadRequestException('La foto debe ser JPEG, PNG o WebP');
+    }
+    await this.fotoRepository.save({ usuarioId: id, contenido: datos, tipoMime });
+  }
+
+  async obtenerFoto(
+    id: number,
+  ): Promise<{ contenido: Buffer; tipoMime: string }> {
+    const foto = await this.fotoRepository.findOne({ where: { usuarioId: id } });
+    if (!foto) {
+      throw new NotFoundException('La cuenta no tiene foto de perfil');
+    }
+    return { contenido: foto.contenido, tipoMime: foto.tipoMime };
+  }
+
+  async quitarFoto(id: number): Promise<void> {
+    await this.fotoRepository.delete({ usuarioId: id });
   }
 
   /**

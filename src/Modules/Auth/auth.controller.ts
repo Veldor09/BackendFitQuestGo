@@ -1,16 +1,23 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Put,
   Req,
   Res,
+  StreamableFile,
   UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthConfig } from './auth.config';
@@ -23,7 +30,12 @@ import { RenovarDto } from './dto/renovar.dto';
 import { OlvideContrasenaDto } from './dto/olvide-contrasena.dto';
 import { RestablecerContrasenaDto } from './dto/restablecer-contrasena.dto';
 import { UpdateUserDto } from '../Usuarios/dto/UserDTO';
+import { ActualizarPerfilEmpresaDto } from './dto/actualizar-perfil-empresa.dto';
+import { Roles } from './decorators/roles.decorator';
 import { GuardiaJwt } from './guards/jwt.guard';
+import { GuardiaRoles } from './guards/roles.guard';
+import { MAX_FOTO_BYTES } from '../Nodos/imagen.util';
+import { RoleId } from '../Usuarios/roles.enum';
 import { UsuarioActual } from './decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from './types/carga-jwt';
 import type { User } from '../Usuarios/user.entity';
@@ -150,6 +162,61 @@ export class AuthController {
   ): Promise<User> {
     const { idrol, terminosAceptadosEn, ...cambiosPermitidos } = dto;
     return this.authService.actualizarPerfil(usuario.id, cambiosPermitidos);
+  }
+
+  /** Una empresa cambia su nombre comercial y su telefono. */
+  @Patch('perfil-empresa')
+  @UseGuards(GuardiaJwt, GuardiaRoles)
+  @Roles(RoleId.Empresa)
+  actualizarPerfilEmpresa(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Body() dto: ActualizarPerfilEmpresaDto,
+  ) {
+    return this.authService.actualizarPerfilEmpresa(usuario.id, dto);
+  }
+
+  /**
+   * Foto de perfil propia (una). Campo multipart `foto`; solo JPEG, PNG o WebP
+   * de hasta 3 MB.
+   */
+  @Post('perfil/foto')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(GuardiaJwt)
+  @UseInterceptors(
+    FileInterceptor('foto', { limits: { fileSize: MAX_FOTO_BYTES } }),
+  )
+  async subirFoto(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @UploadedFile() foto: Express.Multer.File | undefined,
+  ): Promise<void> {
+    if (!foto) {
+      throw new BadRequestException('Falta el archivo en el campo "foto"');
+    }
+    await this.authService.guardarFoto(usuario.id, foto.buffer);
+  }
+
+  @Get('perfil/foto')
+  @UseGuards(GuardiaJwt)
+  async verFoto(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { contenido, tipoMime } = await this.authService.obtenerFoto(
+      usuario.id,
+    );
+    res.set({
+      'Content-Type': tipoMime,
+      // Sin cache: al cambiar la foto la app tiene que ver la nueva enseguida.
+      'Cache-Control': 'no-store',
+    });
+    return new StreamableFile(contenido);
+  }
+
+  @Delete('perfil/foto')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(GuardiaJwt)
+  async quitarFoto(@UsuarioActual() usuario: UsuarioAutenticado): Promise<void> {
+    await this.authService.quitarFoto(usuario.id);
   }
 
   @Post('olvide-contrasena')

@@ -153,7 +153,7 @@ describe('NodoService', () => {
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
         categoria: CategoriaNodo.Otro,
         categoriaOtro: 'Picnic',
-        estado: EstadoNodo.Pendiente,
+        estado: EstadoNodo.Aprobado,
       });
     });
 

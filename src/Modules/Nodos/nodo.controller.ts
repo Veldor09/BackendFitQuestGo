@@ -47,7 +47,7 @@ export class NodoController {
   findAprobados(
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<NodoConVotos[]> {
-    return this.nodoService.findAprobados(actual.id);
+    return this.nodoService.findAprobados(actual.id, actual.rol);
   }
 
   @Get('mios')
@@ -63,11 +63,17 @@ export class NodoController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Nodo> {
-    return this.nodoService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Nodo> {
+    return this.nodoService.verNodo(id, actual);
   }
 
-  /** Proponer un punto de interes (NOD-01/02): cualquier usuario autenticado. */
+  /**
+   * Crear un punto de interes (NOD-01/02): cualquier usuario autenticado. Sale
+   * publicado de inmediato; el admin lo puede rechazar despues.
+   */
   @Post()
   create(
     @Body() dto: CrearNodoDto,
@@ -148,7 +154,7 @@ export class NodoController {
     @Body() dto: VotarNodoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<NodoConVotos> {
-    return this.nodoService.confirmar(id, actual.id, dto);
+    return this.nodoService.confirmar(id, actual.id, dto, actual.rol);
   }
 
   /** NOD-04 "Ya no existe": mismas reglas que "Sigue ahi"; con 3 votos sale del mapa. */
@@ -159,7 +165,7 @@ export class NodoController {
     @Body() dto: VotarNodoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<NodoConVotos> {
-    return this.nodoService.marcarObsoleto(id, actual.id, dto);
+    return this.nodoService.marcarObsoleto(id, actual.id, dto, actual.rol);
   }
 
   /** Aprobar / rechazar (ADM-07): solo admin. */
