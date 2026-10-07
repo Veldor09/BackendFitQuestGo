@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,6 +10,12 @@ import { esAdmin } from '../Auth/es-admin';
 import { esEmpresa, puedeVerContenidoDe } from '../Auth/es-empresa';
 import { RoleId } from '../Usuarios/roles.enum';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { InsigniasService } from '../Insignias/insignias.service';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { CrearRutaDto } from './dto/RutaDTO';
 import { EstadoRuta } from './estado-ruta.enum';
 import { RutaFavorita } from './ruta-favorita.entity';
@@ -16,11 +23,15 @@ import { Ruta } from './ruta.entity';
 
 @Injectable()
 export class RutaService {
+  private readonly logger = new Logger(RutaService.name);
+
   constructor(
     @InjectRepository(Ruta)
     private readonly rutaRepository: Repository<Ruta>,
     @InjectRepository(RutaFavorita)
     private readonly favoritaRepository: Repository<RutaFavorita>,
+    private readonly insigniasService: InsigniasService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   /**
@@ -144,7 +155,7 @@ export class RutaService {
     return ruta;
   }
 
-  create(dto: CrearRutaDto, usuarioId: number): Promise<Ruta> {
+  async create(dto: CrearRutaDto, usuarioId: number): Promise<Ruta> {
     const visibilidad = dto.visibilidad || 'privada';
     const estado = (visibilidad === 'publica' || visibilidad === 'publico')
       ? EstadoRuta.Pendiente
@@ -155,7 +166,45 @@ export class RutaService {
       estado,
       creadoPor: { id: usuarioId },
     });
-    return this.rutaRepository.save(ruta);
+    const guardada = await this.rutaRepository.save(ruta);
+
+    // Notificar al usuario sobre la creación de la ruta
+    try {
+      if (estado === EstadoRuta.Pendiente) {
+        await this.notificacionesService.crear({
+          idUsuario: usuarioId,
+          categoria: CategoriaNotificacion.Rutas,
+          titulo: 'Ruta enviada a revisión',
+          mensaje: `Tu ruta pública "${guardada.nombre}" fue enviada al equipo de moderación.`,
+          referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+          referenciaId: guardada.id,
+        });
+      } else {
+        await this.notificacionesService.crear({
+          idUsuario: usuarioId,
+          categoria: CategoriaNotificacion.Rutas,
+          titulo: 'Ruta creada con éxito',
+          mensaje: `Tu ruta "${guardada.nombre}" ha sido guardada en tus rutas.`,
+          referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+          referenciaId: guardada.id,
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error al notificar creación de ruta para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    // Evaluar insignias en segundo plano seguro (PRIMERA_RUTA, KM_10, KM_50, KM_100)
+    try {
+      await this.insigniasService.evaluar(usuarioId);
+    } catch (error) {
+      this.logger.error(
+        `Error al evaluar insignias tras crear ruta para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    return guardada;
   }
 
   /** Envia una ruta privada a revision (RTE-07/MOD-01). Solo el dueno. */
@@ -170,13 +219,70 @@ export class RutaService {
       );
     }
     ruta.estado = EstadoRuta.Pendiente;
-    return this.rutaRepository.save(ruta);
+    const actualizada = await this.rutaRepository.save(ruta);
+
+    try {
+      await this.notificacionesService.crear({
+        idUsuario: usuarioId,
+        categoria: CategoriaNotificacion.Rutas,
+        titulo: 'Ruta enviada a revisión',
+        mensaje: `Tu solicitud para publicar "${ruta.nombre}" fue enviada al equipo de moderación.`,
+        referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+        referenciaId: ruta.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error al notificar solicitud de publicación de ruta ${id}: ${error.message}`,
+      );
+    }
+
+    return actualizada;
   }
 
   /** Aprobar / rechazar (ADM-05): solo admin. */
   async cambiarEstado(id: number, estado: EstadoRuta): Promise<Ruta> {
-    const ruta = await this.findOne(id);
+    const ruta = await this.rutaRepository.findOne({
+      where: { id },
+      relations: ['creadoPor'],
+    });
+    if (!ruta) {
+      throw new NotFoundException(`Ruta ${id} no encontrada`);
+    }
+    const estadoAnterior = ruta.estado;
     ruta.estado = estado;
-    return this.rutaRepository.save(ruta);
+    const actualizada = await this.rutaRepository.save(ruta);
+
+    const autorId = ruta.creadoPor?.id;
+    if (estadoAnterior !== estado && autorId) {
+      try {
+        if (estado === EstadoRuta.Publicada) {
+          await this.notificacionesService.crear({
+            idUsuario: autorId,
+            categoria: CategoriaNotificacion.Rutas,
+            titulo: `¡Tu ruta "${ruta.nombre}" fue aprobada!`,
+            mensaje:
+              'La moderación verificó el trazado. Tu ruta ya es pública y visible para la comunidad.',
+            referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+            referenciaId: ruta.id,
+          });
+        } else if (estado === EstadoRuta.Rechazada) {
+          await this.notificacionesService.crear({
+            idUsuario: autorId,
+            categoria: CategoriaNotificacion.Rutas,
+            titulo: `Tu ruta "${ruta.nombre}" no fue aprobada`,
+            mensaje: 'La ruta no cumple con los criterios de publicación comunitarios.',
+            referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+            referenciaId: ruta.id,
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error al notificar cambio de estado de ruta ${id}: ${error.message}`,
+        );
+      }
+    }
+
+    return actualizada;
   }
 }
+

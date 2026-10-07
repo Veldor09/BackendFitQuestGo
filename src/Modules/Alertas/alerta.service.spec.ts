@@ -16,6 +16,8 @@ import { User } from '../Usuarios/user.entity';
 import { AlertaVoto } from './alerta-voto.entity';
 import { Alerta } from './alerta.entity';
 import { AlertaService } from './alerta.service';
+import { InsigniasService } from '../Insignias/insignias.service';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { CrearAlertaDto } from './dto/AlertaDTO';
 import {
   EstadoAlerta,
@@ -94,11 +96,21 @@ describe('AlertaService — un voto por persona y solo si estas cerca', () => {
       create: jest.fn((v: DeepPartial<AlertaVoto>) => v as AlertaVoto),
     };
 
+    notificacionesService = { crear: jest.fn().mockResolvedValue({}) };
+
     const modulo = await Test.createTestingModule({
       providers: [
         AlertaService,
         { provide: getRepositoryToken(Alerta), useValue: alertas },
         { provide: getRepositoryToken(AlertaVoto), useValue: votos },
+        {
+          provide: InsigniasService,
+          useValue: { evaluar: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: NotificacionesService,
+          useValue: notificacionesService,
+        },
       ],
     }).compile();
     service = modulo.get(AlertaService);
@@ -131,6 +143,22 @@ describe('AlertaService — un voto por persona y solo si estas cerca', () => {
         tipo: TipoAlerta.Bache,
         tipoOtro: null,
       });
+    });
+
+    it('notifica al usuario cuando se crea y publica la alerta', async () => {
+      const nuevaAlerta = alertaActiva({ id: 99, creadoPor: { id: USUARIO_ID } as User });
+      alertas.save.mockResolvedValueOnce(nuevaAlerta);
+
+      await service.create(dto(), USUARIO_ID);
+
+      expect(notificacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: USUARIO_ID,
+          categoria: 'alertas',
+          referenciaTipo: 'alerta',
+          referenciaId: 99,
+        }),
+      );
     });
 
     it.each([

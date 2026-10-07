@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,6 +10,12 @@ import { In, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { distanciaMetros } from '../../common/distancia.util';
 import { esViolacionDeUnicidad } from '../../common/postgres';
 import { RADIO_VOTO_METROS } from '../../common/votacion';
+import { InsigniasService } from '../Insignias/insignias.service';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { CrearAlertaDto, VotarAlertaDto } from './dto/AlertaDTO';
 import { AlertaVoto } from './alerta-voto.entity';
 import { Alerta } from './alerta.entity';
@@ -33,12 +40,38 @@ function vigenciaDesdeAhora(gravedad: GravedadAlerta): Date {
 
 @Injectable()
 export class AlertaService {
+  private readonly logger = new Logger(AlertaService.name);
+
   constructor(
     @InjectRepository(Alerta)
     private readonly alertaRepository: Repository<Alerta>,
     @InjectRepository(AlertaVoto)
     private readonly votoRepository: Repository<AlertaVoto>,
+    private readonly insigniasService: InsigniasService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
+
+  /**
+   * Punto encapsulado para notificar al autor cuando su alerta pasa a publicada / activa.
+   */
+  async notificarAlertaPublicada(alerta: Alerta): Promise<void> {
+    const autorId = alerta.creadoPor?.id;
+    if (!autorId) return;
+    try {
+      await this.notificacionesService.crear({
+        idUsuario: autorId,
+        categoria: CategoriaNotificacion.Alertas,
+        titulo: '¡Alerta reportada con éxito!',
+        mensaje: 'Tu reporte ya es visible para la comunidad en el mapa.',
+        referenciaTipo: ReferenciaTipoNotificacion.Alerta,
+        referenciaId: alerta.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error al notificar alerta publicada ${alerta.id}: ${error.message}`,
+      );
+    }
+  }
 
   /**
    * Alertas vigentes: para el mapa (HOM-01) y para la supervision del admin
@@ -84,7 +117,7 @@ export class AlertaService {
     return alerta;
   }
 
-  create(dto: CrearAlertaDto, usuarioId: number): Promise<Alerta> {
+  async create(dto: CrearAlertaDto, usuarioId: number): Promise<Alerta> {
     const alerta = this.alertaRepository.create({
       ...dto,
       // El texto libre solo tiene sentido con el tipo "otro".
@@ -94,7 +127,21 @@ export class AlertaService {
       creadoPor: { id: usuarioId },
       expiraEn: vigenciaDesdeAhora(dto.gravedad),
     });
-    return this.alertaRepository.save(alerta);
+    const guardada = await this.alertaRepository.save(alerta);
+
+    // Notificar al usuario que su alerta fue creada y publicada
+    await this.notificarAlertaPublicada(guardada);
+
+    // Evaluar insignia PRIMERA_ALERTA
+    try {
+      await this.insigniasService.evaluar(usuarioId);
+    } catch (error) {
+      this.logger.error(
+        `Error al evaluar insignias tras crear alerta para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    return guardada;
   }
 
   /**
@@ -123,9 +170,36 @@ export class AlertaService {
 
   /** ADM-06 "Marcar resuelta": accion manual del admin. */
   async cambiarEstado(id: number, estado: EstadoAlerta): Promise<Alerta> {
-    const alerta = await this.findOne(id);
+    const alerta = await this.alertaRepository.findOne({
+      where: { id },
+      relations: ['creadoPor'],
+    });
+    if (!alerta) {
+      throw new NotFoundException(`Alerta ${id} no encontrada`);
+    }
+    const estadoAnterior = alerta.estado;
     alerta.estado = estado;
-    return this.alertaRepository.save(alerta);
+    const actualizada = await this.alertaRepository.save(alerta);
+
+    const autorId = alerta.creadoPor?.id;
+    if (estadoAnterior !== estado && autorId && estado === EstadoAlerta.Resuelta) {
+      try {
+        await this.notificacionesService.crear({
+          idUsuario: autorId,
+          categoria: CategoriaNotificacion.Alertas,
+          titulo: 'Tu alerta fue marcada como resuelta',
+          mensaje: 'Un administrador ha verificado y marcado tu reporte como resuelto.',
+          referenciaTipo: ReferenciaTipoNotificacion.Alerta,
+          referenciaId: alerta.id,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Error al notificar cambio de estado de alerta ${id}: ${error.message}`,
+        );
+      }
+    }
+
+    return actualizada;
   }
 
   /** ADM-06 "Eliminar". */

@@ -17,6 +17,12 @@ import { EstadoNodo, TipoVotoNodo, UMBRAL_OBSOLETO } from './estado-nodo.enum';
 import { MAX_FOTO_BYTES } from './imagen.util';
 import { NodoFoto } from './nodo-foto.entity';
 import { NodoVoto } from './nodo-voto.entity';
+import { InsigniasService } from '../Insignias/insignias.service';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { Nodo } from './nodo.entity';
 import { NodoService } from './nodo.service';
 
@@ -91,6 +97,7 @@ const violacionDeUnicidad = () =>
 
 describe('NodoService', () => {
   let service: NodoService;
+  let notificacionesService: { crear: jest.Mock };
   let nodos: {
     findOne: jest.Mock<Promise<Nodo | null>, [unknown]>;
     save: jest.Mock<Promise<Nodo>, [Nodo]>;
@@ -108,6 +115,7 @@ describe('NodoService', () => {
   };
 
   beforeEach(async () => {
+    notificacionesService = { crear: jest.fn().mockResolvedValue({}) };
     nodos = {
       findOne: jest.fn<Promise<Nodo | null>, [unknown]>(),
       save: jest.fn((n: Nodo) => Promise.resolve(n)),
@@ -131,6 +139,14 @@ describe('NodoService', () => {
         { provide: getRepositoryToken(Nodo), useValue: nodos },
         { provide: getRepositoryToken(NodoFoto), useValue: fotos },
         { provide: getRepositoryToken(NodoVoto), useValue: votos },
+        {
+          provide: InsigniasService,
+          useValue: { evaluar: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: NotificacionesService,
+          useValue: notificacionesService,
+        },
       ],
     }).compile();
     service = modulo.get(NodoService);
@@ -163,6 +179,67 @@ describe('NodoService', () => {
         categoria: CategoriaNodo.Agua,
         categoriaOtro: null,
       });
+    });
+
+    it('notifica al usuario cuando se crea el punto de interés y queda en revisión', async () => {
+      const nuevoNodo = nodo({ id: 50, nombre: 'Mirador del Sol' });
+      nodos.save.mockResolvedValueOnce(nuevoNodo);
+
+      await service.create(dto({ nombre: 'Mirador del Sol' }), AUTOR);
+
+      expect(notificacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: AUTOR,
+          categoria: CategoriaNotificacion.Eventos,
+          titulo: 'Punto de interés enviado a revisión',
+          referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+          referenciaId: 50,
+        }),
+      );
+    });
+  });
+
+  describe('cambiarEstado', () => {
+    it('notifica al autor cuando el punto de interés es aprobado', async () => {
+      const nodoExistente = nodo({
+        id: 55,
+        nombre: 'Taller Comunitario',
+        estado: EstadoNodo.Pendiente,
+      });
+      nodos.findOne.mockResolvedValueOnce(nodoExistente);
+
+      await service.cambiarEstado(55, EstadoNodo.Aprobado);
+
+      expect(notificacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: AUTOR,
+          categoria: CategoriaNotificacion.Eventos,
+          titulo: '¡Tu punto de interés "Taller Comunitario" fue aprobado!',
+          referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+          referenciaId: 55,
+        }),
+      );
+    });
+
+    it('notifica al autor cuando el punto de interés es rechazado', async () => {
+      const nodoExistente = nodo({
+        id: 56,
+        nombre: 'Punto Inexistente',
+        estado: EstadoNodo.Pendiente,
+      });
+      nodos.findOne.mockResolvedValueOnce(nodoExistente);
+
+      await service.cambiarEstado(56, EstadoNodo.Rechazado);
+
+      expect(notificacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: AUTOR,
+          categoria: CategoriaNotificacion.Eventos,
+          titulo: 'Tu punto de interés "Punto Inexistente" no fue aprobado',
+          referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+          referenciaId: 56,
+        }),
+      );
     });
   });
 
