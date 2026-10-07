@@ -96,6 +96,8 @@ describe('AlertaService — un voto por persona y solo si estas cerca', () => {
       create: jest.fn((v: DeepPartial<AlertaVoto>) => v as AlertaVoto),
     };
 
+    notificacionesService = { crear: jest.fn().mockResolvedValue({}) };
+
     const modulo = await Test.createTestingModule({
       providers: [
         AlertaService,
@@ -107,7 +109,7 @@ describe('AlertaService — un voto por persona y solo si estas cerca', () => {
         },
         {
           provide: NotificacionesService,
-          useValue: { crear: jest.fn().mockResolvedValue({}) },
+          useValue: notificacionesService,
         },
       ],
     }).compile();
@@ -141,6 +143,22 @@ describe('AlertaService — un voto por persona y solo si estas cerca', () => {
         tipo: TipoAlerta.Bache,
         tipoOtro: null,
       });
+    });
+
+    it('notifica al usuario cuando se crea y publica la alerta', async () => {
+      const nuevaAlerta = alertaActiva({ id: 99, creadoPor: { id: USUARIO_ID } as User });
+      alertas.save.mockResolvedValueOnce(nuevaAlerta);
+
+      await service.create(dto(), USUARIO_ID);
+
+      expect(notificacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: USUARIO_ID,
+          categoria: 'alertas',
+          referenciaTipo: 'alerta',
+          referenciaId: 99,
+        }),
+      );
     });
 
     it.each([

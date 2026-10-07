@@ -55,13 +55,14 @@ export class AlertaService {
    * Punto encapsulado para notificar al autor cuando su alerta pasa a publicada / activa.
    */
   async notificarAlertaPublicada(alerta: Alerta): Promise<void> {
-    if (!alerta.creadoPor?.id) return;
+    const autorId = alerta.creadoPor?.id;
+    if (!autorId) return;
     try {
       await this.notificacionesService.crear({
-        idUsuario: alerta.creadoPor.id,
+        idUsuario: autorId,
         categoria: CategoriaNotificacion.Alertas,
-        titulo: 'Tu alerta fue publicada',
-        mensaje: 'Tu reporte ya es visible para la comunidad.',
+        titulo: '¡Alerta reportada con éxito!',
+        mensaje: 'Tu reporte ya es visible para la comunidad en el mapa.',
         referenciaTipo: ReferenciaTipoNotificacion.Alerta,
         referenciaId: alerta.id,
       });
@@ -128,6 +129,9 @@ export class AlertaService {
     });
     const guardada = await this.alertaRepository.save(alerta);
 
+    // Notificar al usuario que su alerta fue creada y publicada
+    await this.notificarAlertaPublicada(guardada);
+
     // Evaluar insignia PRIMERA_ALERTA
     try {
       await this.insigniasService.evaluar(usuarioId);
@@ -166,9 +170,36 @@ export class AlertaService {
 
   /** ADM-06 "Marcar resuelta": accion manual del admin. */
   async cambiarEstado(id: number, estado: EstadoAlerta): Promise<Alerta> {
-    const alerta = await this.findOne(id);
+    const alerta = await this.alertaRepository.findOne({
+      where: { id },
+      relations: ['creadoPor'],
+    });
+    if (!alerta) {
+      throw new NotFoundException(`Alerta ${id} no encontrada`);
+    }
+    const estadoAnterior = alerta.estado;
     alerta.estado = estado;
-    return this.alertaRepository.save(alerta);
+    const actualizada = await this.alertaRepository.save(alerta);
+
+    const autorId = alerta.creadoPor?.id;
+    if (estadoAnterior !== estado && autorId && estado === EstadoAlerta.Resuelta) {
+      try {
+        await this.notificacionesService.crear({
+          idUsuario: autorId,
+          categoria: CategoriaNotificacion.Alertas,
+          titulo: 'Tu alerta fue marcada como resuelta',
+          mensaje: 'Un administrador ha verificado y marcado tu reporte como resuelto.',
+          referenciaTipo: ReferenciaTipoNotificacion.Alerta,
+          referenciaId: alerta.id,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Error al notificar cambio de estado de alerta ${id}: ${error.message}`,
+        );
+      }
+    }
+
+    return actualizada;
   }
 
   /** ADM-06 "Eliminar". */

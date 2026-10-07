@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from '../Auth/seguridad.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
+import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
 import { Nodo } from './nodo.entity';
 import { NodoFoto } from './nodo-foto.entity';
 import { NodoVoto } from './nodo-voto.entity';
@@ -13,6 +14,7 @@ import { NodoService } from './nodo.service';
     TypeOrmModule.forFeature([Nodo, NodoFoto, NodoVoto]),
     SeguridadModule,
     InsigniasModule,
+    NotificacionesModule,
   ],
   controllers: [NodoController],
   providers: [NodoService],

@@ -114,4 +114,98 @@ describe('RutaService - Notificaciones y Moderación', () => {
       }),
     );
   });
+
+  it('debe notificar al autor cuando crea una ruta privada', async () => {
+    const rutaCreada = {
+      id: 30,
+      nombre: 'Paseo por el parque',
+      estado: EstadoRuta.Privada,
+      visibilidad: 'privada',
+      creadoPor: { id: 7 },
+    } as any;
+
+    rutaRepo.create.mockReturnValue(rutaCreada);
+    rutaRepo.save.mockResolvedValue(rutaCreada);
+
+    await service.create(
+      {
+        nombre: 'Paseo por el parque',
+        actividades: [] as any,
+        dificultad: 'facil',
+        distanciaKm: 5,
+        puntos: [],
+        visibilidad: 'privada',
+      },
+      7,
+    );
+
+    expect(notificacionesService.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idUsuario: 7,
+        categoria: CategoriaNotificacion.Rutas,
+        titulo: 'Ruta creada con éxito',
+        referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+        referenciaId: 30,
+      }),
+    );
+  });
+
+  it('debe notificar al autor cuando crea una ruta pública que queda en revisión', async () => {
+    const rutaCreada = {
+      id: 31,
+      nombre: 'Sendero del Volcán',
+      estado: EstadoRuta.Pendiente,
+      visibilidad: 'publica',
+      creadoPor: { id: 7 },
+    } as any;
+
+    rutaRepo.create.mockReturnValue(rutaCreada);
+    rutaRepo.save.mockResolvedValue(rutaCreada);
+
+    await service.create(
+      {
+        nombre: 'Sendero del Volcán',
+        actividades: [] as any,
+        dificultad: 'dificil',
+        distanciaKm: 12,
+        puntos: [],
+        visibilidad: 'publica',
+      },
+      7,
+    );
+
+    expect(notificacionesService.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idUsuario: 7,
+        categoria: CategoriaNotificacion.Rutas,
+        titulo: 'Ruta enviada a revisión',
+        referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+        referenciaId: 31,
+      }),
+    );
+  });
+
+  it('debe notificar al autor cuando solicita publicación de una ruta privada', async () => {
+    const rutaExistente = {
+      id: 32,
+      nombre: 'Ruta de Entrenamiento',
+      estado: EstadoRuta.Privada,
+      creadoPor: { id: 7, nombreUser: 'Juan' },
+    } as any;
+
+    rutaRepo.findOne.mockResolvedValue(rutaExistente);
+    rutaRepo.save.mockImplementation(async (r: any) => r);
+
+    await service.solicitarPublicacion(32, 7);
+
+    expect(notificacionesService.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idUsuario: 7,
+        categoria: CategoriaNotificacion.Rutas,
+        titulo: 'Ruta enviada a revisión',
+        referenciaTipo: ReferenciaTipoNotificacion.Ruta,
+        referenciaId: 32,
+      }),
+    );
+  });
 });

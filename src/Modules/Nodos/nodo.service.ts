@@ -15,6 +15,11 @@ import { RADIO_VOTO_METROS } from '../../common/votacion';
 import { esAdmin } from '../Auth/es-admin';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { InsigniasService } from '../Insignias/insignias.service';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import type { User } from '../Usuarios/user.entity';
 import { CategoriaNodo } from './categoria-nodo.enum';
 import { CrearNodoDto, VotarNodoDto } from './dto/NodoDTO';
@@ -64,6 +69,7 @@ export class NodoService {
     @InjectRepository(NodoVoto)
     private readonly votoRepository: Repository<NodoVoto>,
     private readonly insigniasService: InsigniasService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   /**
@@ -132,6 +138,22 @@ export class NodoService {
     });
     const guardado = await this.nodoRepository.save(nodo);
 
+    // Notificar al usuario sobre el envío a revisión del punto de interés
+    try {
+      await this.notificacionesService.crear({
+        idUsuario: usuarioId,
+        categoria: CategoriaNotificacion.Eventos,
+        titulo: 'Punto de interés enviado a revisión',
+        mensaje: `Tu propuesta de punto de interés "${guardado.nombre}" fue enviada al equipo de moderación.`,
+        referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+        referenciaId: guardado.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error al notificar creación de nodo para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
     // Evaluar insignia PRIMER_PUNTO_INTERES
     try {
       await this.insigniasService.evaluar(usuarioId);
@@ -145,9 +167,49 @@ export class NodoService {
   }
 
   async cambiarEstado(id: number, estado: EstadoNodo): Promise<Nodo> {
-    const nodo = await this.findOne(id);
+    const nodo = await this.nodoRepository.findOne({
+      where: { id },
+      relations: ['creadoPor'],
+    });
+    if (!nodo) {
+      throw new NotFoundException(`Nodo ${id} no encontrado`);
+    }
+    const estadoAnterior = nodo.estado;
     nodo.estado = estado;
-    return this.nodoRepository.save(nodo);
+    const actualizado = await this.nodoRepository.save(nodo);
+
+    const autorId = nodo.creadoPor?.id;
+    if (estadoAnterior !== estado && autorId) {
+      try {
+        if (estado === EstadoNodo.Aprobado) {
+          await this.notificacionesService.crear({
+            idUsuario: autorId,
+            categoria: CategoriaNotificacion.Eventos,
+            titulo: `¡Tu punto de interés "${nodo.nombre}" fue aprobado!`,
+            mensaje:
+              'La moderación validó tu propuesta. El punto de interés ya es visible en el mapa.',
+            referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+            referenciaId: nodo.id,
+          });
+        } else if (estado === EstadoNodo.Rechazado) {
+          await this.notificacionesService.crear({
+            idUsuario: autorId,
+            categoria: CategoriaNotificacion.Eventos,
+            titulo: `Tu punto de interés "${nodo.nombre}" no fue aprobado`,
+            mensaje:
+              'La propuesta no cumple con los criterios de moderación comunitarios.',
+            referenciaTipo: ReferenciaTipoNotificacion.Nodo,
+            referenciaId: nodo.id,
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error al notificar cambio de estado de nodo ${id}: ${error.message}`,
+        );
+      }
+    }
+
+    return actualizado;
   }
 
   /** NOD-04 "Sigue ahi": quien pasa por el punto confirma que existe. */
