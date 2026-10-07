@@ -9,6 +9,7 @@ import { ContrasenasServicio } from './services/contrasenas.service';
 import { TokensServicio } from './services/tokens.service';
 import { MailService } from './services/mail.service';
 import { RestablecimientoContrasena } from './entities/restablecimiento-contrasena.entity';
+import { RoleId } from '../Usuarios/roles.enum';
 
 describe('AuthService — recuperacion de contrasena', () => {
   let service: AuthService;
@@ -167,5 +168,102 @@ describe('AuthService — recuperacion de contrasena', () => {
       );
       expect(tokens.revocarTodasDelUsuario).toHaveBeenCalledWith(5);
     });
+  });
+});
+
+describe('AuthService — registro de empresa', () => {
+  let service: AuthService;
+  let userService: { createUser: jest.Mock };
+  let tokens: {
+    firmarAccessToken: jest.Mock;
+    emitirRefreshToken: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    userService = {
+      createUser: jest.fn().mockImplementation((dto: Partial<User>) =>
+        Promise.resolve({
+          id: 9,
+          nombreUser: dto.nombreUser,
+          emailUser: dto.emailUser,
+          idrol: dto.idrol,
+        } as User),
+      ),
+    };
+    tokens = {
+      firmarAccessToken: jest.fn().mockResolvedValue('jwt'),
+      emitirRefreshToken: jest.fn().mockResolvedValue({
+        tokenPlano: 'refresh',
+        expiraEn: new Date('2030-01-01'),
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(User), useValue: {} },
+        {
+          provide: getRepositoryToken(RestablecimientoContrasena),
+          useValue: {},
+        },
+        { provide: UserService, useValue: userService },
+        { provide: ContrasenasServicio, useValue: {} },
+        { provide: TokensServicio, useValue: tokens },
+        { provide: MailService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get(AuthService);
+  });
+
+  it('crea el usuario con rol Empresa, nombre comercial sin espacios sobrantes y telefono', async () => {
+    const resultado = await service.registrarEmpresa(
+      {
+        nombreComercial: '  Cafe El Roble  ',
+        email: 'contacto@elroble.co',
+        contrasena: 'contrasena123',
+        telefono: '8888-8888',
+        aceptaTerminos: true,
+      },
+      {},
+    );
+
+    expect(userService.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nombreUser: 'Cafe El Roble',
+        emailUser: 'contacto@elroble.co',
+        passwordUserHash: 'contrasena123',
+        idrol: RoleId.Empresa,
+        telefono: '8888-8888',
+        terminosAceptadosEn: expect.any(Date) as Date,
+      }),
+    );
+    expect(resultado.usuario).toEqual({
+      id: 9,
+      nombre: 'Cafe El Roble',
+      email: 'contacto@elroble.co',
+      rol: RoleId.Empresa,
+    });
+    expect(tokens.firmarAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 9, rol: RoleId.Empresa }),
+    );
+  });
+
+  it('no deja que un registro de empresa pida otro rol', async () => {
+    await service.registrarEmpresa(
+      {
+        nombreComercial: 'Taller Bici',
+        email: 'a@b.co',
+        contrasena: 'contrasena123',
+        aceptaTerminos: true,
+        // @ts-expect-error el DTO no tiene `idrol`; simula un cuerpo manipulado
+        idrol: 3,
+      },
+      {},
+    );
+    const enviado = userService.createUser.mock.calls[0][0] as {
+      idrol: number;
+    };
+    expect(enviado.idrol).toBe(RoleId.Empresa);
   });
 });

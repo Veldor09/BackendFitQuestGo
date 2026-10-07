@@ -15,7 +15,9 @@ import {
 import {
   MAX_NOMBRE_USUARIO,
   MENSAJE_NOMBRE_INVALIDO,
+  MENSAJE_TELEFONO_INVALIDO,
   NOMBRE_PERSONA_REGEX,
+  TELEFONO_REGEX,
 } from '../../../common/reglas-usuario';
 import { EstadoUsuario } from '../estado.enum';
 import { RoleId } from '../roles.enum';
@@ -70,6 +72,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   visibilidad?: string;
+
+  @IsOptional()
+  @Matches(TELEFONO_REGEX, { message: MENSAJE_TELEFONO_INVALIDO })
+  telefono?: string;
 }
 
 // Todos los campos de CreateUserDto pero opcionales, conservando sus validaciones.

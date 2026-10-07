@@ -5,11 +5,12 @@ import { SeguridadModule } from '../Auth/seguridad.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
 import { UserController } from './user.controller';
 import { User } from './user.entity';
+import { UsuarioFoto } from './usuario-foto.entity';
 import { UserService } from './user.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, UsuarioFoto]),
     RoleModule,
     SeguridadModule,
     InsigniasModule,

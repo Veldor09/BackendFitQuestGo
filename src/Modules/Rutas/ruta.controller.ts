@@ -24,8 +24,8 @@ export class RutaController {
   constructor(private readonly rutaService: RutaService) {}
 
   @Get('explorar')
-  findPublicadas(): Promise<Ruta[]> {
-    return this.rutaService.findPublicadas();
+  findPublicadas(@UsuarioActual() actual: UsuarioAutenticado): Promise<Ruta[]> {
+    return this.rutaService.findPublicadas(actual.rol);
   }
 
   @Get('mias')
@@ -36,7 +36,7 @@ export class RutaController {
   /** Rutas guardadas / favoritas del usuario (RTE-03). */
   @Get('favoritas')
   findFavoritas(@UsuarioActual() actual: UsuarioAutenticado): Promise<Ruta[]> {
-    return this.rutaService.findFavoritas(actual.id);
+    return this.rutaService.findFavoritas(actual.id, actual.rol);
   }
 
   /** Lista de IDs de rutas favoritas para la UI. */
@@ -53,7 +53,7 @@ export class RutaController {
     @Param('id', ParseIntPipe) id: number,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<{ favorita: boolean }> {
-    return this.rutaService.toggleFavorita(id, actual.id);
+    return this.rutaService.toggleFavorita(id, actual.id, actual.rol);
   }
 
   @Get('pendientes')

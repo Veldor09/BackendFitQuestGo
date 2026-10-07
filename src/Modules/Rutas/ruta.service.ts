@@ -7,6 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { esAdmin } from '../Auth/es-admin';
+import { esEmpresa, puedeVerContenidoDe } from '../Auth/es-empresa';
+import { RoleId } from '../Usuarios/roles.enum';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { InsigniasService } from '../Insignias/insignias.service';
 import {
@@ -35,14 +37,19 @@ export class RutaService {
   /**
    * Explorar rutas comunitarias (RTE-01).
    */
-  findPublicadas(): Promise<Ruta[]> {
-    return this.rutaRepository
+  findPublicadas(rol?: number): Promise<Ruta[]> {
+    const consulta = this.rutaRepository
       .createQueryBuilder('ruta')
       .leftJoin('ruta.creadoPor', 'creadoPor')
       .addSelect(['creadoPor.id', 'creadoPor.nombreUser'])
-      .where('ruta.estado = :estado', { estado: EstadoRuta.Publicada })
-      .orderBy('ruta.id', 'DESC')
-      .getMany();
+      .where('ruta.estado = :estado', { estado: EstadoRuta.Publicada });
+    // Una empresa solo ve las rutas de empresas, no las de los deportistas.
+    if (rol !== undefined && esEmpresa({ rol })) {
+      consulta.andWhere('creadoPor.idrol = :rolEmpresa', {
+        rolEmpresa: RoleId.Empresa,
+      });
+    }
+    return consulta.orderBy('ruta.id', 'DESC').getMany();
   }
 
   /** Mis rutas, todos los estados (RTE-02). */
@@ -54,7 +61,7 @@ export class RutaService {
   }
 
   /** Rutas guardadas / favoritas del usuario (RTE-03). */
-  async findFavoritas(usuarioId: number): Promise<Ruta[]> {
+  async findFavoritas(usuarioId: number, rol?: number): Promise<Ruta[]> {
     const favs = await this.favoritaRepository.find({
       where: { usuarioId },
       order: { guardadoEn: 'DESC' },
@@ -65,9 +72,12 @@ export class RutaService {
     }
 
     const ids = favs.map((f) => f.rutaId);
-    return this.rutaRepository.find({
+    const rutas = await this.rutaRepository.find({
       where: { id: In(ids) },
     });
+    return rol === undefined
+      ? rutas
+      : rutas.filter((r) => puedeVerContenidoDe({ rol }, r.creadoPor));
   }
 
   /** Lista de IDs de rutas favoritas para marcar en UI. */
@@ -83,9 +93,13 @@ export class RutaService {
   async toggleFavorita(
     rutaId: number,
     usuarioId: number,
+    rol?: number,
   ): Promise<{ favorita: boolean }> {
     const ruta = await this.rutaRepository.findOne({ where: { id: rutaId } });
-    if (!ruta) {
+    if (
+      !ruta ||
+      (rol !== undefined && !puedeVerContenidoDe({ rol }, ruta.creadoPor))
+    ) {
       throw new NotFoundException(`Ruta ${rutaId} no encontrada`);
     }
 
@@ -131,9 +145,10 @@ export class RutaService {
   async verRuta(id: number, actual: UsuarioAutenticado): Promise<Ruta> {
     const ruta = await this.findOne(id);
     const puedeVer =
-      ruta.estado === EstadoRuta.Publicada ||
-      ruta.creadoPor.id === actual.id ||
-      esAdmin(actual);
+      puedeVerContenidoDe(actual, ruta.creadoPor) &&
+      (ruta.estado === EstadoRuta.Publicada ||
+        ruta.creadoPor.id === actual.id ||
+        esAdmin(actual));
     if (!puedeVer) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
     }

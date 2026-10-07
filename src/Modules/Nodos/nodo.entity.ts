@@ -46,6 +46,15 @@ export class Nodo {
   @Column({ type: 'varchar', length: 500, nullable: true })
   descripcion: string | null;
 
+  // Cupon o beneficio que ofrece un comercio a quien pasa por aqui (modulo 5).
+  @Column({ type: 'varchar', length: 300, nullable: true })
+  beneficio: string | null;
+
+  // Nodo de Abastecimiento: lo creo una cuenta Empresa. Se dibuja distinto
+  // en el mapa y no pasa por la cola de moderacion.
+  @Column({ type: 'boolean', default: false })
+  patrocinado: boolean;
+
   @Column({ type: 'varchar', length: 20, default: EstadoNodo.Pendiente })
   estado: EstadoNodo;
 

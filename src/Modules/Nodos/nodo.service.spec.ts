@@ -56,6 +56,8 @@ const nodo = (parcial: Partial<Nodo> = {}): Nodo => ({
   lat: 9.93,
   lng: -84.09,
   descripcion: null,
+  beneficio: null,
+  patrocinado: false,
   estado: EstadoNodo.Pendiente,
   conFoto: false,
   creadoPor: { id: AUTOR, nombreUser: 'Ana', emailUser: 'ana@x.co' } as User,
@@ -167,7 +169,7 @@ describe('NodoService', () => {
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
         categoria: CategoriaNodo.Otro,
         categoriaOtro: 'Picnic',
-        estado: EstadoNodo.Pendiente,
+        estado: EstadoNodo.Aprobado,
       });
     });
 

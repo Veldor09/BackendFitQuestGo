@@ -10,6 +10,7 @@ import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
 import { ClimaModule } from './Modules/Clima/clima.module';
 import { InsigniasModule } from './Modules/Insignias/insignias.module';
+import { EventoModule } from './Modules/Eventos/evento.module';
 import { NodoModule } from './Modules/Nodos/nodo.module';
 import { NotificacionesModule } from './Modules/Notificaciones/notificaciones.module';
 import { RutaModule } from './Modules/Rutas/ruta.module';
@@ -42,6 +43,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     ClimaModule,
     NotificacionesModule,
     InsigniasModule,
+    EventoModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
