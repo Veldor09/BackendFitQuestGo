@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
+import { Transform } from 'class-transformer';
 import {
   IsEnum,
   IsLatitude,
@@ -6,8 +7,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
+import { CategoriaNodo, MAX_CATEGORIA_OTRO } from '../categoria-nodo.enum';
 import { EstadoNodo } from '../estado-nodo.enum';
 
 export class CrearNodoDto {
@@ -16,10 +20,20 @@ export class CrearNodoDto {
   @MaxLength(100, { message: 'El nombre admite maximo 100 caracteres' })
   nombre: string;
 
+  @IsEnum(CategoriaNodo, { message: 'La categoria no es valida' })
+  categoria: CategoriaNodo;
+
+  /** Solo cuando `categoria` es `otro`: de que categoria se trata. */
+  @ValidateIf((o: CrearNodoDto) => o.categoria === CategoriaNodo.Otro)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
-  @IsNotEmpty({ message: 'La categoria es obligatoria' })
-  @MaxLength(50, { message: 'La categoria admite maximo 50 caracteres' })
-  categoria: string;
+  @Matches(/\S/, { message: 'Escribi de que categoria se trata' })
+  @MaxLength(MAX_CATEGORIA_OTRO, {
+    message: `La categoria admite maximo ${MAX_CATEGORIA_OTRO} caracteres`,
+  })
+  categoriaOtro?: string;
 
   @IsLatitude({ message: 'lat debe ser una latitud valida' })
   lat: number;
@@ -35,9 +49,18 @@ export class CrearNodoDto {
 
 export class ActualizarNodoDto extends PartialType(CrearNodoDto) {}
 
+/** Posicion de quien vota: el servidor valida que este cerca del punto. */
+export class VotarNodoDto {
+  @IsLatitude({ message: 'lat debe ser una latitud valida' })
+  lat: number;
+
+  @IsLongitude({ message: 'lng debe ser una longitud valida' })
+  lng: number;
+}
+
 export class CambiarEstadoNodoDto {
   @IsEnum(EstadoNodo, {
-    message: 'El estado debe ser Pendiente, Aprobado o Rechazado',
+    message: 'El estado debe ser Pendiente, Aprobado, Rechazado u Obsoleto',
   })
   estado: EstadoNodo;
 }

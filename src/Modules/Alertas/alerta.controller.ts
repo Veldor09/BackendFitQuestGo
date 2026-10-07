@@ -18,8 +18,12 @@ import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from '../Usuarios/roles.enum';
 import { Alerta } from './alerta.entity';
-import { AlertaService } from './alerta.service';
-import { CambiarEstadoAlertaDto, CrearAlertaDto } from './dto/AlertaDTO';
+import { AlertaConVoto, AlertaService } from './alerta.service';
+import {
+  CambiarEstadoAlertaDto,
+  CrearAlertaDto,
+  VotarAlertaDto,
+} from './dto/AlertaDTO';
 
 /**
  * A diferencia de /nodos, aca no hay ruta ".../pendientes": el mismo listado
@@ -37,8 +41,10 @@ export class AlertaController {
   }
 
   @Get()
-  findActivas(): Promise<Alerta[]> {
-    return this.alertaService.findActivas();
+  findActivas(
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<AlertaConVoto[]> {
+    return this.alertaService.findActivas(actual.id);
   }
 
   @Get(':id')
@@ -55,18 +61,32 @@ export class AlertaController {
     return this.alertaService.create(dto, actual.id);
   }
 
-  /** ALR-04 "Confirmar": sigue vigente. */
+  /**
+   * ALR-04 "Confirmar": sigue vigente. Un voto por persona y solo estando a
+   * menos de 150 m: 400 si estas lejos, 409 si ya votaste o la alerta se cerro.
+   */
   @Patch(':id/confirmar')
   @HttpCode(HttpStatus.OK)
-  confirmar(@Param('id', ParseIntPipe) id: number): Promise<Alerta> {
-    return this.alertaService.confirmar(id);
+  confirmar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: VotarAlertaDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<AlertaConVoto> {
+    return this.alertaService.confirmar(id, actual.id, dto);
   }
 
-  /** ALR-04/05 "Ya no esta": suma una duda, se autorresuelve al llegar al umbral. */
+  /**
+   * ALR-04/05 "Ya no esta": suma una duda, se autorresuelve al llegar al
+   * umbral. Mismas reglas de voto unico y cercania que "Confirmar".
+   */
   @Patch(':id/desmentir')
   @HttpCode(HttpStatus.OK)
-  desmentir(@Param('id', ParseIntPipe) id: number): Promise<Alerta> {
-    return this.alertaService.desmentir(id);
+  desmentir(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: VotarAlertaDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<AlertaConVoto> {
+    return this.alertaService.desmentir(id, actual.id, dto);
   }
 
   /** ADM-06 "Marcar resuelta": solo admin. */

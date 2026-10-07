@@ -6,18 +6,24 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { SoloAutorPublico } from '../../common/autor-publico';
 import { User } from '../Usuarios/user.entity';
 import { EstadoAlerta, GravedadAlerta } from './estado-alerta.enum';
+import { TipoAlerta } from './tipo-alerta.enum';
 
 @Entity('alertas')
 export class Alerta {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // Texto libre (Arbol caido, Perro, Bache, Derrumbe, ...). Candidato a
-  // catalogo (ADM-11) cuando haga falta, igual que Nodo.categoria.
+  // Clave de la lista cerrada `TipoAlerta` (arbol_caido, bache, ...).
+  // Candidata a catalogo editable (ADM-11), igual que Nodo.categoria.
   @Column({ type: 'varchar', length: 50 })
-  tipo: string;
+  tipo: TipoAlerta;
+
+  // Solo cuando `tipo` es `otro`: lo que escribio quien reporto.
+  @Column({ name: 'tipo_otro', type: 'varchar', length: 50, nullable: true })
+  tipoOtro: string | null;
 
   @Column({ type: 'varchar', length: 10 })
   gravedad: GravedadAlerta;
@@ -39,6 +45,7 @@ export class Alerta {
   @Column({ name: 'confirmaciones_no', type: 'int', default: 0 })
   confirmacionesNo: number;
 
+  @SoloAutorPublico()
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
   creadoPor: User;

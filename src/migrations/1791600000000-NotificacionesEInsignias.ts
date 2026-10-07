@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class NotificacionesEInsignias1791500000000 implements MigrationInterface {
-  name = 'NotificacionesEInsignias1791500000000';
+export class NotificacionesEInsignias1791600000000 implements MigrationInterface {
+  name = 'NotificacionesEInsignias1791600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Crear tabla notificacion

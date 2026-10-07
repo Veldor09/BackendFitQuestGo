@@ -6,7 +6,9 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { SoloAutorPublico } from '../../common/autor-publico';
 import { User } from '../Usuarios/user.entity';
+import { CategoriaNodo } from './categoria-nodo.enum';
 import { EstadoNodo } from './estado-nodo.enum';
 
 @Entity('nodos')
@@ -17,10 +19,23 @@ export class Nodo {
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
 
-  // Texto libre por ahora (Agua, Restaurante, Taller, Mirador, ...).
-  // Candidato a moverse a un catalogo (ADM-11) cuando haga falta.
+  // Clave de la lista cerrada `CategoriaNodo` (agua, mirador, ...). Candidata
+  // a moverse a un catalogo editable (ADM-11) cuando haga falta.
   @Column({ type: 'varchar', length: 50 })
-  categoria: string;
+  categoria: CategoriaNodo;
+
+  // Solo cuando `categoria` es `otro`: lo que escribio quien lo propuso.
+  @Column({
+    name: 'categoria_otro',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  categoriaOtro: string | null;
+
+  // Hay una foto en `nodo_fotos`; se pide aparte (GET /nodos/:id/foto).
+  @Column({ name: 'con_foto', type: 'boolean', default: false })
+  conFoto: boolean;
 
   @Column({ type: 'double precision' })
   lat: number;
@@ -34,6 +49,7 @@ export class Nodo {
   @Column({ type: 'varchar', length: 20, default: EstadoNodo.Pendiente })
   estado: EstadoNodo;
 
+  @SoloAutorPublico()
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
   creadoPor: User;
