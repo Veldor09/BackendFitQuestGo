@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -13,6 +13,7 @@ import { InsigniasModule } from './Modules/Insignias/insignias.module';
 import { EventoModule } from './Modules/Eventos/evento.module';
 import { NodoModule } from './Modules/Nodos/nodo.module';
 import { NotificacionesModule } from './Modules/Notificaciones/notificaciones.module';
+import { ReporteContenidoModule } from './Modules/ReportesContenido/reporte-contenido.module';
 import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
@@ -39,6 +40,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     AuthModule,
     NodoModule,
     RutaModule,
+    ReporteContenidoModule,
     AlertaModule,
     ClimaModule,
     NotificacionesModule,
@@ -49,3 +51,4 @@ import { UserModule } from './Modules/Usuarios/user.module';
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
+
