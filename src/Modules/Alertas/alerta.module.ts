@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from '../Auth/seguridad.module';
+import { CatalogosModule } from '../Catalogos/catalogos.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
 import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
 import { Alerta } from './alerta.entity';
@@ -13,6 +14,7 @@ import { AlertaService } from './alerta.service';
   imports: [
     TypeOrmModule.forFeature([Alerta, AlertaVoto]),
     SeguridadModule,
+    CatalogosModule,
     NotificacionesModule,
     InsigniasModule,
   ],
@@ -21,4 +23,3 @@ import { AlertaService } from './alerta.service';
   exports: [AlertaService],
 })
 export class AlertaModule {}
-

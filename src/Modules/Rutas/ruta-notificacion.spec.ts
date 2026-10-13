@@ -1,9 +1,15 @@
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CatalogosService } from '../Catalogos/catalogos.service';
 import { InsigniasService } from '../Insignias/insignias.service';
-import { CategoriaNotificacion, ReferenciaTipoNotificacion } from '../Notificaciones/notificacion.enum';
+import {
+  CategoriaNotificacion,
+  ReferenciaTipoNotificacion,
+} from '../Notificaciones/notificacion.enum';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
+import { ActividadRuta } from './actividad-ruta.enum';
 import { EstadoRuta } from './estado-ruta.enum';
 import { RutaFavorita } from './ruta-favorita.entity';
 import { Ruta } from './ruta.entity';
@@ -14,6 +20,7 @@ describe('RutaService - Notificaciones y Moderación', () => {
   let rutaRepo: jest.Mocked<Repository<Ruta>>;
   let notificacionesService: jest.Mocked<NotificacionesService>;
   let insigniasService: jest.Mocked<InsigniasService>;
+  let catalogosService: jest.Mocked<CatalogosService>;
 
   beforeEach(async () => {
     const mockRutaRepo = {
@@ -32,11 +39,15 @@ describe('RutaService - Notificaciones y Moderación', () => {
     };
 
     const mockNotificacionesService = {
-      crear: jest.fn(),
+      crear: jest.fn().mockResolvedValue({}),
     };
 
     const mockInsigniasService = {
-      evaluar: jest.fn(),
+      evaluar: jest.fn().mockResolvedValue([]),
+    };
+
+    const mockCatalogosService = {
+      existeClaveActiva: jest.fn().mockResolvedValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -58,6 +69,10 @@ describe('RutaService - Notificaciones y Moderación', () => {
           provide: InsigniasService,
           useValue: mockInsigniasService,
         },
+        {
+          provide: CatalogosService,
+          useValue: mockCatalogosService,
+        },
       ],
     }).compile();
 
@@ -65,6 +80,7 @@ describe('RutaService - Notificaciones y Moderación', () => {
     rutaRepo = module.get(getRepositoryToken(Ruta));
     notificacionesService = module.get(NotificacionesService);
     insigniasService = module.get(InsigniasService);
+    catalogosService = module.get(CatalogosService);
   });
 
   it('debe notificar al autor cuando una ruta es aprobada (Publicada)', async () => {
@@ -72,13 +88,19 @@ describe('RutaService - Notificaciones y Moderación', () => {
       id: 15,
       nombre: 'Cerro Grande',
       estado: EstadoRuta.Pendiente,
-      creadoPor: { id: 7, nombreUser: 'Juan' },
-    } as any;
+      creadoPor: {
+        id: 7,
+        nombreUser: 'Juan',
+      },
+    } as Ruta;
 
     rutaRepo.findOne.mockResolvedValue(rutaExistente);
-    rutaRepo.save.mockImplementation(async (r: any) => r);
+    rutaRepo.save.mockImplementation(async (r) => r);
 
-    await service.cambiarEstado(15, EstadoRuta.Publicada);
+    await service.cambiarEstado(
+      15,
+      EstadoRuta.Publicada,
+    );
 
     expect(notificacionesService.crear).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -96,13 +118,19 @@ describe('RutaService - Notificaciones y Moderación', () => {
       id: 20,
       nombre: 'Ruta Insegura',
       estado: EstadoRuta.Pendiente,
-      creadoPor: { id: 7, nombreUser: 'Juan' },
-    } as any;
+      creadoPor: {
+        id: 7,
+        nombreUser: 'Juan',
+      },
+    } as Ruta;
 
     rutaRepo.findOne.mockResolvedValue(rutaExistente);
-    rutaRepo.save.mockImplementation(async (r: any) => r);
+    rutaRepo.save.mockImplementation(async (r) => r);
 
-    await service.cambiarEstado(20, EstadoRuta.Rechazada);
+    await service.cambiarEstado(
+      20,
+      EstadoRuta.Rechazada,
+    );
 
     expect(notificacionesService.crear).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -121,8 +149,9 @@ describe('RutaService - Notificaciones y Moderación', () => {
       nombre: 'Paseo por el parque',
       estado: EstadoRuta.Privada,
       visibilidad: 'privada',
+      actividades: [ActividadRuta.Running],
       creadoPor: { id: 7 },
-    } as any;
+    } as Ruta;
 
     rutaRepo.create.mockReturnValue(rutaCreada);
     rutaRepo.save.mockResolvedValue(rutaCreada);
@@ -130,13 +159,18 @@ describe('RutaService - Notificaciones y Moderación', () => {
     await service.create(
       {
         nombre: 'Paseo por el parque',
-        actividades: [] as any,
+        actividades: [ActividadRuta.Running],
         dificultad: 'facil',
         distanciaKm: 5,
         puntos: [],
         visibilidad: 'privada',
       },
       7,
+    );
+
+    expect(catalogosService.existeClaveActiva).toHaveBeenCalledWith(
+      'actividades',
+      ActividadRuta.Running,
     );
 
     expect(notificacionesService.crear).toHaveBeenCalledWith(
@@ -148,6 +182,8 @@ describe('RutaService - Notificaciones y Moderación', () => {
         referenciaId: 30,
       }),
     );
+
+    expect(insigniasService.evaluar).toHaveBeenCalled();
   });
 
   it('debe notificar al autor cuando crea una ruta pública que queda en revisión', async () => {
@@ -156,8 +192,9 @@ describe('RutaService - Notificaciones y Moderación', () => {
       nombre: 'Sendero del Volcán',
       estado: EstadoRuta.Pendiente,
       visibilidad: 'publica',
+      actividades: [ActividadRuta.Running],
       creadoPor: { id: 7 },
-    } as any;
+    } as Ruta;
 
     rutaRepo.create.mockReturnValue(rutaCreada);
     rutaRepo.save.mockResolvedValue(rutaCreada);
@@ -165,13 +202,18 @@ describe('RutaService - Notificaciones y Moderación', () => {
     await service.create(
       {
         nombre: 'Sendero del Volcán',
-        actividades: [] as any,
+        actividades: [ActividadRuta.Running],
         dificultad: 'dificil',
         distanciaKm: 12,
         puntos: [],
         visibilidad: 'publica',
       },
       7,
+    );
+
+    expect(catalogosService.existeClaveActiva).toHaveBeenCalledWith(
+      'actividades',
+      ActividadRuta.Running,
     );
 
     expect(notificacionesService.crear).toHaveBeenCalledWith(
@@ -183,6 +225,8 @@ describe('RutaService - Notificaciones y Moderación', () => {
         referenciaId: 31,
       }),
     );
+
+    expect(insigniasService.evaluar).toHaveBeenCalled();
   });
 
   it('debe notificar al autor cuando solicita publicación de una ruta privada', async () => {
@@ -190,11 +234,14 @@ describe('RutaService - Notificaciones y Moderación', () => {
       id: 32,
       nombre: 'Ruta de Entrenamiento',
       estado: EstadoRuta.Privada,
-      creadoPor: { id: 7, nombreUser: 'Juan' },
-    } as any;
+      creadoPor: {
+        id: 7,
+        nombreUser: 'Juan',
+      },
+    } as Ruta;
 
     rutaRepo.findOne.mockResolvedValue(rutaExistente);
-    rutaRepo.save.mockImplementation(async (r: any) => r);
+    rutaRepo.save.mockImplementation(async (r) => r);
 
     await service.solicitarPublicacion(32, 7);
 

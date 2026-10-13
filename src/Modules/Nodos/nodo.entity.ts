@@ -1,3 +1,4 @@
+
 import {
   Column,
   CreateDateColumn,
@@ -8,7 +9,6 @@ import {
 } from 'typeorm';
 import { SoloAutorPublico } from '../../common/autor-publico';
 import { User } from '../Usuarios/user.entity';
-import { CategoriaNodo } from './categoria-nodo.enum';
 import { EstadoNodo } from './estado-nodo.enum';
 
 @Entity('nodos')
@@ -19,10 +19,9 @@ export class Nodo {
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
 
-  // Clave de la lista cerrada `CategoriaNodo` (agua, mirador, ...). Candidata
-  // a moverse a un catalogo editable (ADM-11) cuando haga falta.
+  // Clave del catalogo administrable de categorias de nodos (ADM-11).
   @Column({ type: 'varchar', length: 50 })
-  categoria: CategoriaNodo;
+  categoria: string;
 
   // Solo cuando `categoria` es `otro`: lo que escribio quien lo propuso.
   @Column({
