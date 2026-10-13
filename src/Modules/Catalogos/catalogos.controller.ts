@@ -32,6 +32,16 @@ export class CatalogosController {
     return this.catalogosService.listarCatalogos();
   }
 
+  /**
+   * Consulta de elementos activos para usuarios autenticados.
+   * No permite consultar elementos desactivados ni modificar catálogos.
+   */
+  @Get(':catalogo/activos')
+  @Roles(RoleId.UserNormal, RoleId.Empresa, RoleId.Admin)
+  listarItemsActivos(@Param('catalogo') catalogo: string) {
+    return this.catalogosService.listarItemsActivos(catalogo);
+  }
+
   @Get(':catalogo')
   listarItems(@Param('catalogo') catalogo: string) {
     return this.catalogosService.listarItems(catalogo);

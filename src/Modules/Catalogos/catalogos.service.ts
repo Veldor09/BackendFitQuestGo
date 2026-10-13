@@ -90,6 +90,22 @@ export class CatalogosService {
     });
   }
 
+  /**
+   * Devuelve únicamente los elementos activos.
+   * Se utiliza en los formularios de usuarios autenticados.
+   */
+  async listarItemsActivos(catalogo: string): Promise<CatalogoItem[]> {
+    this.validarCatalogo(catalogo);
+
+    return this.catalogoRepository.find({
+      where: {
+        catalogo,
+        activo: true,
+      },
+      order: { id: 'ASC' },
+    });
+  }
+
   async crearItem(
     catalogo: string,
     clave: string,
