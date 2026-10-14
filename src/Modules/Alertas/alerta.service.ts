@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ConflictException,
@@ -10,6 +11,7 @@ import { In, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { distanciaMetros } from '../../common/distancia.util';
 import { esViolacionDeUnicidad } from '../../common/postgres';
 import { RADIO_VOTO_METROS } from '../../common/votacion';
+import { CatalogosService } from '../Catalogos/catalogos.service';
 import { InsigniasService } from '../Insignias/insignias.service';
 import {
   CategoriaNotificacion,
@@ -49,6 +51,7 @@ export class AlertaService {
     private readonly votoRepository: Repository<AlertaVoto>,
     private readonly insigniasService: InsigniasService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly catalogosService: CatalogosService,
   ) {}
 
   /**
@@ -118,6 +121,18 @@ export class AlertaService {
   }
 
   async create(dto: CrearAlertaDto, usuarioId: number): Promise<Alerta> {
+    // ADM-11: aceptar únicamente claves activas del catálogo administrable.
+    const tipoValido = await this.catalogosService.existeClaveActiva(
+      'alertas',
+      dto.tipo,
+    );
+
+    if (!tipoValido) {
+      throw new BadRequestException(
+        'El tipo de alerta no existe o se encuentra inactivo',
+      );
+    }
+
     const alerta = this.alertaRepository.create({
       ...dto,
       // El texto libre solo tiene sentido con el tipo "otro".

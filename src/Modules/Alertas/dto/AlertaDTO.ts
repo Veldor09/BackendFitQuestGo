@@ -14,8 +14,17 @@ import { EstadoAlerta, GravedadAlerta } from '../estado-alerta.enum';
 import { MAX_TIPO_OTRO, TipoAlerta } from '../tipo-alerta.enum';
 
 export class CrearAlertaDto {
-  @IsEnum(TipoAlerta, { message: 'El tipo de alerta no es valido' })
-  tipo: TipoAlerta;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString({ message: 'El tipo de alerta debe ser texto' })
+  @Matches(/^[a-z0-9_]+$/, {
+    message: 'El tipo de alerta debe ser una clave valida',
+  })
+  @MaxLength(50, {
+    message: 'El tipo de alerta admite maximo 50 caracteres',
+  })
+  tipo: string;
 
   /** Solo cuando `tipo` es `otro`: de que alerta se trata. */
   @ValidateIf((o: CrearAlertaDto) => o.tipo === TipoAlerta.Otro)

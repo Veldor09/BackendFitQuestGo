@@ -1,3 +1,4 @@
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -8,6 +9,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { opcionesConexion } from './db-options';
 import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
+import { CatalogosModule } from './Modules/Catalogos/catalogos.module';
 import { ClimaModule } from './Modules/Clima/clima.module';
 import { InsigniasModule } from './Modules/Insignias/insignias.module';
 import { EventoModule } from './Modules/Eventos/evento.module';
@@ -40,6 +42,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     NodoModule,
     RutaModule,
     AlertaModule,
+    CatalogosModule,
     ClimaModule,
     NotificacionesModule,
     InsigniasModule,
