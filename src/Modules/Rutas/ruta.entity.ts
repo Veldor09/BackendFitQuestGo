@@ -1,3 +1,4 @@
+
 import {
   Column,
   CreateDateColumn,
@@ -8,7 +9,6 @@ import {
 } from 'typeorm';
 import { SoloAutorPublico } from '../../common/autor-publico';
 import { User } from '../Usuarios/user.entity';
-import { ActividadRuta } from './actividad-ruta.enum';
 import { EstadoRuta } from './estado-ruta.enum';
 
 export interface PuntoRuta {
@@ -24,10 +24,10 @@ export class Ruta {
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
 
-  // Una o varias claves de la lista cerrada `ActividadRuta` (running,
-  // ciclismo, ...). Arreglo nativo de Postgres: `text[]`.
+  // Claves del catalogo administrable de actividades (ADM-11).
+  // Arreglo nativo de PostgreSQL: text[].
   @Column({ type: 'text', array: true })
-  actividades: ActividadRuta[];
+  actividades: string[];
 
   @Column({ type: 'varchar', length: 20, default: 'moderada' })
   dificultad: string;

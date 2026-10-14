@@ -1,3 +1,4 @@
+
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform } from 'class-transformer';
 import {
@@ -20,8 +21,17 @@ export class CrearNodoDto {
   @MaxLength(100, { message: 'El nombre admite maximo 100 caracteres' })
   nombre: string;
 
-  @IsEnum(CategoriaNodo, { message: 'La categoria no es valida' })
-  categoria: CategoriaNodo;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString({ message: 'La categoria debe ser texto' })
+  @Matches(/^[a-z][a-z0-9_]*$/, {
+    message: 'La categoria debe ser una clave valida',
+  })
+  @MaxLength(50, {
+    message: 'La categoria admite maximo 50 caracteres',
+  })
+  categoria: string;
 
   /** Solo cuando `categoria` es `otro`: de que categoria se trata. */
   @ValidateIf((o: CrearNodoDto) => o.categoria === CategoriaNodo.Otro)

@@ -1,4 +1,6 @@
+
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -10,6 +12,7 @@ import { esAdmin } from '../Auth/es-admin';
 import { esEmpresa, puedeVerContenidoDe } from '../Auth/es-empresa';
 import { RoleId } from '../Usuarios/roles.enum';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { CatalogosService } from '../Catalogos/catalogos.service';
 import { InsigniasService } from '../Insignias/insignias.service';
 import {
   CategoriaNotificacion,
@@ -32,7 +35,29 @@ export class RutaService {
     private readonly favoritaRepository: Repository<RutaFavorita>,
     private readonly insigniasService: InsigniasService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly catalogosService: CatalogosService,
   ) {}
+
+  /**
+   * ADM-11: valida que todas las actividades seleccionadas
+   * existan y esten activas en el catalogo administrable.
+   */
+  private async validarActividadesActivas(
+    actividades: string[],
+  ): Promise<void> {
+    for (const actividad of actividades) {
+      const activa = await this.catalogosService.existeClaveActiva(
+        'actividades',
+        actividad,
+      );
+
+      if (!activa) {
+        throw new BadRequestException(
+          `La actividad "${actividad}" no existe o se encuentra inactiva`,
+        );
+      }
+    }
+  }
 
   /**
    * Explorar rutas comunitarias (RTE-01).
@@ -43,12 +68,14 @@ export class RutaService {
       .leftJoin('ruta.creadoPor', 'creadoPor')
       .addSelect(['creadoPor.id', 'creadoPor.nombreUser'])
       .where('ruta.estado = :estado', { estado: EstadoRuta.Publicada });
+
     // Una empresa solo ve las rutas de empresas, no las de los deportistas.
     if (rol !== undefined && esEmpresa({ rol })) {
       consulta.andWhere('creadoPor.idrol = :rolEmpresa', {
         rolEmpresa: RoleId.Empresa,
       });
     }
+
     return consulta.orderBy('ruta.id', 'DESC').getMany();
   }
 
@@ -75,6 +102,7 @@ export class RutaService {
     const rutas = await this.rutaRepository.find({
       where: { id: In(ids) },
     });
+
     return rol === undefined
       ? rutas
       : rutas.filter((r) => puedeVerContenidoDe({ rol }, r.creadoPor));
@@ -86,6 +114,7 @@ export class RutaService {
       where: { usuarioId },
       select: ['rutaId'],
     });
+
     return favs.map((f) => f.rutaId);
   }
 
@@ -95,7 +124,10 @@ export class RutaService {
     usuarioId: number,
     rol?: number,
   ): Promise<{ favorita: boolean }> {
-    const ruta = await this.rutaRepository.findOne({ where: { id: rutaId } });
+    const ruta = await this.rutaRepository.findOne({
+      where: { id: rutaId },
+    });
+
     if (
       !ruta ||
       (rol !== undefined && !puedeVerContenidoDe({ rol }, ruta.creadoPor))
@@ -116,7 +148,9 @@ export class RutaService {
       usuarioId,
       rutaId,
     });
+
     await this.favoritaRepository.save(fav);
+
     return { favorita: true };
   }
 
@@ -129,10 +163,14 @@ export class RutaService {
   }
 
   async findOne(id: number): Promise<Ruta> {
-    const ruta = await this.rutaRepository.findOne({ where: { id } });
+    const ruta = await this.rutaRepository.findOne({
+      where: { id },
+    });
+
     if (!ruta) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
     }
+
     return ruta;
   }
 
@@ -142,30 +180,43 @@ export class RutaService {
    * mostrar de donde sale y adonde llega alguien. Para el resto responde 404,
    * igual que si no existiera.
    */
-  async verRuta(id: number, actual: UsuarioAutenticado): Promise<Ruta> {
+  async verRuta(
+    id: number,
+    actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
     const ruta = await this.findOne(id);
+
     const puedeVer =
       puedeVerContenidoDe(actual, ruta.creadoPor) &&
       (ruta.estado === EstadoRuta.Publicada ||
         ruta.creadoPor.id === actual.id ||
         esAdmin(actual));
+
     if (!puedeVer) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
     }
+
     return ruta;
   }
 
   async create(dto: CrearRutaDto, usuarioId: number): Promise<Ruta> {
+    // ADM-11: comprobar todas las actividades antes de guardar.
+    await this.validarActividadesActivas(dto.actividades);
+
     const visibilidad = dto.visibilidad || 'privada';
-    const estado = (visibilidad === 'publica' || visibilidad === 'publico')
-      ? EstadoRuta.Pendiente
-      : EstadoRuta.Privada;
+
+    const estado =
+      visibilidad === 'publica' || visibilidad === 'publico'
+        ? EstadoRuta.Pendiente
+        : EstadoRuta.Privada;
+
     const ruta = this.rutaRepository.create({
       ...dto,
       visibilidad,
       estado,
       creadoPor: { id: usuarioId },
     });
+
     const guardada = await this.rutaRepository.save(ruta);
 
     // Notificar al usuario sobre la creación de la ruta
@@ -195,7 +246,8 @@ export class RutaService {
       );
     }
 
-    // Evaluar insignias en segundo plano seguro (PRIMERA_RUTA, KM_10, KM_50, KM_100)
+    // Evaluar insignias en segundo plano seguro
+    // (PRIMERA_RUTA, KM_10, KM_50, KM_100).
     try {
       await this.insigniasService.evaluar(usuarioId);
     } catch (error) {
@@ -208,17 +260,24 @@ export class RutaService {
   }
 
   /** Envia una ruta privada a revision (RTE-07/MOD-01). Solo el dueno. */
-  async solicitarPublicacion(id: number, usuarioId: number): Promise<Ruta> {
+  async solicitarPublicacion(
+    id: number,
+    usuarioId: number,
+  ): Promise<Ruta> {
     const ruta = await this.findOne(id);
+
     if (ruta.creadoPor.id !== usuarioId) {
       throw new ForbiddenException('Esta ruta no te pertenece');
     }
+
     if (ruta.estado !== EstadoRuta.Privada) {
       throw new ForbiddenException(
         'Solo una ruta privada puede enviarse a revision',
       );
     }
+
     ruta.estado = EstadoRuta.Pendiente;
+
     const actualizada = await this.rutaRepository.save(ruta);
 
     try {
@@ -240,19 +299,26 @@ export class RutaService {
   }
 
   /** Aprobar / rechazar (ADM-05): solo admin. */
-  async cambiarEstado(id: number, estado: EstadoRuta): Promise<Ruta> {
+  async cambiarEstado(
+    id: number,
+    estado: EstadoRuta,
+  ): Promise<Ruta> {
     const ruta = await this.rutaRepository.findOne({
       where: { id },
       relations: ['creadoPor'],
     });
+
     if (!ruta) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
     }
+
     const estadoAnterior = ruta.estado;
     ruta.estado = estado;
+
     const actualizada = await this.rutaRepository.save(ruta);
 
     const autorId = ruta.creadoPor?.id;
+
     if (estadoAnterior !== estado && autorId) {
       try {
         if (estado === EstadoRuta.Publicada) {
@@ -270,7 +336,8 @@ export class RutaService {
             idUsuario: autorId,
             categoria: CategoriaNotificacion.Rutas,
             titulo: `Tu ruta "${ruta.nombre}" no fue aprobada`,
-            mensaje: 'La ruta no cumple con los criterios de publicación comunitarios.',
+            mensaje:
+              'La ruta no cumple con los criterios de publicación comunitarios.',
             referenciaTipo: ReferenciaTipoNotificacion.Ruta,
             referenciaId: ruta.id,
           });
@@ -285,4 +352,3 @@ export class RutaService {
     return actualizada;
   }
 }
-
