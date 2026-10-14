@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ConflictException,
@@ -15,6 +16,7 @@ import { RADIO_VOTO_METROS } from '../../common/votacion';
 import { esAdmin } from '../Auth/es-admin';
 import { esEmpresa, puedeVerContenidoDe } from '../Auth/es-empresa';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { CatalogosService } from '../Catalogos/catalogos.service';
 import { InsigniasService } from '../Insignias/insignias.service';
 import {
   CategoriaNotificacion,
@@ -72,14 +74,31 @@ export class NodoService {
     private readonly votoRepository: Repository<NodoVoto>,
     private readonly insigniasService: InsigniasService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly catalogosService: CatalogosService,
   ) {}
+
+  /**
+   * Valida que una categoria exista y este activa en el catalogo ADM-11.
+   */
+  private async validarCategoriaActiva(categoria: string): Promise<void> {
+    const categoriaValida = await this.catalogosService.existeClaveActiva(
+      'nodos',
+      categoria,
+    );
+
+    if (!categoriaValida) {
+      throw new BadRequestException(
+        'La categoria del nodo no existe o se encuentra inactiva',
+      );
+    }
+  }
 
   /**
    * Nodos visibles en el mapa: solo los aprobados. `creadoPor` es eager y
    * `select` no recorta columnas de relaciones eager de forma confiable, asi
    * que se arma con QueryBuilder para no exponer el correo de quien lo
    * propuso a cualquiera que mire el mapa. Cada uno trae el recuento de votos
-   * y `miVoto`, para que la app no le vuelva a pedir el voto a quien ya votó.
+   * y `miVoto`, para que la app no le vuelva a pedir el voto a quien ya voto.
    */
   async findAprobados(
     usuarioId: number,
@@ -90,19 +109,24 @@ export class NodoService {
       .leftJoin('nodo.creadoPor', 'creadoPor')
       .addSelect(['creadoPor.id', 'creadoPor.nombreUser'])
       .where('nodo.estado = :estado', { estado: EstadoNodo.Aprobado });
+
     // Una empresa solo ve los nodos de empresas, no los de los deportistas.
     if (rol !== undefined && esEmpresa({ rol })) {
       consulta.andWhere('creadoPor.idrol = :rolEmpresa', {
         rolEmpresa: RoleId.Empresa,
       });
     }
+
     const nodos = await consulta.orderBy('nodo.id', 'DESC').getMany();
+
     if (nodos.length === 0) {
       return [];
     }
+
     const votos = await this.votoRepository.find({
       where: { nodoId: In(nodos.map((n) => n.id)) },
     });
+
     return nodos.map((n) =>
       conVotos(
         n,
@@ -129,9 +153,11 @@ export class NodoService {
 
   async findOne(id: number): Promise<Nodo> {
     const nodo = await this.nodoRepository.findOne({ where: { id } });
+
     if (!nodo) {
       throw new NotFoundException(`Nodo ${id} no encontrado`);
     }
+
     return nodo;
   }
 
@@ -141,9 +167,11 @@ export class NodoService {
    */
   async verNodo(id: number, actual: UsuarioAutenticado): Promise<Nodo> {
     const nodo = await this.findOne(id);
+
     if (!puedeVerContenidoDe(actual, nodo.creadoPor)) {
       throw new NotFoundException(`Nodo ${id} no encontrado`);
     }
+
     return nodo;
   }
 
@@ -159,7 +187,10 @@ export class NodoService {
     usuarioId: number,
     rol?: number,
   ): Promise<Nodo> {
+    await this.validarCategoriaActiva(dto.categoria);
+
     const esEmpresa = rol === Number(RoleId.Empresa);
+
     const nodo = this.nodoRepository.create({
       ...dto,
       // El texto libre solo tiene sentido con la categoria "otro".
@@ -172,9 +203,10 @@ export class NodoService {
       estado: EstadoNodo.Aprobado,
       creadoPor: { id: usuarioId },
     });
+
     const guardado = await this.nodoRepository.save(nodo);
 
-    // Notificar al usuario sobre el envío a revisión del punto de interés
+    // Notificar al usuario sobre el envio a revision del punto de interes
     try {
       await this.notificacionesService.crear({
         idUsuario: usuarioId,
@@ -209,9 +241,17 @@ export class NodoService {
     actual: UsuarioAutenticado,
   ): Promise<Nodo> {
     const nodo = await this.findOne(id);
+
     if (!nodo.patrocinado || nodo.creadoPor.id !== actual.id) {
       throw new ForbiddenException('Este nodo no te pertenece');
     }
+
+    // Solo se valida cuando se solicita cambiar la categoria.
+    // Una categoria desactivada no impide editar otros datos del nodo.
+    if (dto.categoria !== undefined) {
+      await this.validarCategoriaActiva(dto.categoria);
+    }
+
     if (dto.nombre !== undefined) nodo.nombre = dto.nombre;
     if (dto.categoria !== undefined) nodo.categoria = dto.categoria;
     if (dto.lat !== undefined) nodo.lat = dto.lat;
@@ -219,25 +259,31 @@ export class NodoService {
     if (dto.descripcion !== undefined) {
       nodo.descripcion = dto.descripcion.trim() || null;
     }
+
     if (dto.beneficio !== undefined) {
       nodo.beneficio = this.limpiarBeneficio(dto.beneficio);
     }
+
     if (dto.categoria !== undefined || dto.categoriaOtro !== undefined) {
       nodo.categoriaOtro =
         nodo.categoria === CategoriaNodo.Otro
           ? (dto.categoriaOtro ?? nodo.categoriaOtro ?? null)
           : null;
     }
+
     return this.nodoRepository.save(nodo);
   }
 
   /** Baja de un nodo patrocinado: su empresa o un admin. */
   async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
     const nodo = await this.findOne(id);
+
     const esSuyo = nodo.patrocinado && nodo.creadoPor.id === actual.id;
+
     if (!esSuyo && !esAdmin(actual)) {
       throw new ForbiddenException('Este nodo no te pertenece');
     }
+
     await this.nodoRepository.remove(nodo);
   }
 
@@ -250,14 +296,18 @@ export class NodoService {
       where: { id },
       relations: ['creadoPor'],
     });
+
     if (!nodo) {
       throw new NotFoundException(`Nodo ${id} no encontrado`);
     }
+
     const estadoAnterior = nodo.estado;
     nodo.estado = estado;
+
     const actualizado = await this.nodoRepository.save(nodo);
 
     const autorId = nodo.creadoPor?.id;
+
     if (estadoAnterior !== estado && autorId) {
       try {
         if (estado === EstadoNodo.Aprobado) {
@@ -327,12 +377,15 @@ export class NodoService {
     rol?: number,
   ): Promise<NodoConVotos> {
     const nodo = await this.findOne(id);
+
     if (rol !== undefined && !puedeVerContenidoDe({ rol }, nodo.creadoPor)) {
       throw new NotFoundException(`Nodo ${id} no encontrado`);
     }
+
     if (nodo.estado !== EstadoNodo.Aprobado) {
       throw new ConflictException('El punto ya no esta en el mapa');
     }
+
     if (nodo.creadoPor.id === usuarioId) {
       throw new ForbiddenException(
         'No podes votar un punto que propusiste vos',
@@ -345,6 +398,7 @@ export class NodoService {
       nodo.lat,
       nodo.lng,
     );
+
     if (distancia > RADIO_VOTO_METROS) {
       throw new BadRequestException(
         `Estas a ${Math.round(distancia)} m del punto: acercate a menos de ${RADIO_VOTO_METROS} m para votar`,
@@ -356,12 +410,15 @@ export class NodoService {
     const votos = await this.votoRepository.find({
       where: { nodoId: nodo.id },
     });
+
     const confirmaciones = contar(votos, TipoVotoNodo.Confirmar);
     const obsoletos = contar(votos, TipoVotoNodo.Obsoleto);
+
     if (obsoletos >= UMBRAL_OBSOLETO && obsoletos > confirmaciones) {
       nodo.estado = EstadoNodo.Obsoleto;
       await this.nodoRepository.save(nodo);
     }
+
     return conVotos(nodo, votos, usuarioId);
   }
 
@@ -380,6 +437,7 @@ export class NodoService {
       if (esViolacionDeUnicidad(error)) {
         throw new ConflictException('Ya votaste este punto');
       }
+
       throw error;
     }
   }
@@ -394,20 +452,26 @@ export class NodoService {
     actual: UsuarioAutenticado,
   ): Promise<Nodo> {
     const nodo = await this.findOne(id);
+
     if (nodo.creadoPor.id !== actual.id && !esAdmin(actual)) {
       throw new ForbiddenException('Este punto no te pertenece');
     }
+
     if (datos.length > MAX_FOTO_BYTES) {
       throw new PayloadTooLargeException(
         `La foto pesa mas de ${MAX_FOTO_BYTES / (1024 * 1024)} MB`,
       );
     }
+
     const tipoMime: TipoImagen | null = detectarTipoImagen(datos);
+
     if (!tipoMime) {
       throw new BadRequestException('La foto debe ser JPEG, PNG o WebP');
     }
+
     await this.fotoRepository.save({ nodoId: id, contenido: datos, tipoMime });
     nodo.conFoto = true;
+
     return this.nodoRepository.save(nodo);
   }
 
@@ -421,17 +485,21 @@ export class NodoService {
     actual: UsuarioAutenticado,
   ): Promise<{ contenido: Buffer; tipoMime: string }> {
     const nodo = await this.findOne(id);
+
     const puedeVer =
       puedeVerContenidoDe(actual, nodo.creadoPor) &&
       (nodo.estado === EstadoNodo.Aprobado ||
         nodo.creadoPor.id === actual.id ||
         esAdmin(actual));
+
     const foto = puedeVer
       ? await this.fotoRepository.findOne({ where: { nodoId: id } })
       : null;
+
     if (!foto) {
       throw new NotFoundException(`El nodo ${id} no tiene foto`);
     }
+
     return { contenido: foto.contenido, tipoMime: foto.tipoMime };
   }
 }

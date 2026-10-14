@@ -1,8 +1,15 @@
-import { ForbiddenException } from '@nestjs/common';
+
+import {
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DeepPartial } from 'typeorm';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { CatalogosService } from '../Catalogos/catalogos.service';
+import { InsigniasService } from '../Insignias/insignias.service';
+import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { RoleId } from '../Usuarios/roles.enum';
 import { User } from '../Usuarios/user.entity';
 import { CategoriaNodo } from './categoria-nodo.enum';
@@ -18,18 +25,22 @@ const EMPRESA: UsuarioAutenticado = {
   email: 'cafe@x.co',
   rol: RoleId.Empresa,
 };
+
 const OTRA_EMPRESA: UsuarioAutenticado = {
   id: 21,
   email: 'bici@x.co',
   rol: RoleId.Empresa,
 };
+
 const ADMIN: UsuarioAutenticado = {
   id: 1,
   email: 'adm@x.co',
   rol: RoleId.Admin,
 };
 
-const nodoDeEmpresa = (parcial: Partial<Nodo> = {}): Nodo => ({
+const nodoDeEmpresa = (
+  parcial: Partial<Nodo> = {},
+): Nodo => ({
   id: 8,
   nombre: 'Cafe El Roble',
   categoria: CategoriaNodo.Restaurante,
@@ -41,12 +52,17 @@ const nodoDeEmpresa = (parcial: Partial<Nodo> = {}): Nodo => ({
   patrocinado: true,
   estado: EstadoNodo.Aprobado,
   conFoto: false,
-  creadoPor: { id: EMPRESA.id, nombreUser: 'Cafe El Roble' } as User,
+  creadoPor: {
+    id: EMPRESA.id,
+    nombreUser: 'Cafe El Roble',
+  } as User,
   creadoEn: new Date(),
   ...parcial,
 });
 
-const dto = (parcial: Partial<CrearNodoDto> = {}): CrearNodoDto => ({
+const dto = (
+  parcial: Partial<CrearNodoDto> = {},
+): CrearNodoDto => ({
   nombre: 'Cafe El Roble',
   categoria: CategoriaNodo.Restaurante,
   lat: 9.93,
@@ -56,6 +72,7 @@ const dto = (parcial: Partial<CrearNodoDto> = {}): CrearNodoDto => ({
 
 describe('NodoService — nodos patrocinados (modulo 5)', () => {
   let service: NodoService;
+
   let nodos: {
     findOne: jest.Mock<Promise<Nodo | null>, [unknown]>;
     save: jest.Mock<Promise<Nodo>, [Nodo]>;
@@ -63,31 +80,71 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
     remove: jest.Mock<Promise<Nodo>, [Nodo]>;
   };
 
+  let catalogosService: {
+    existeClaveActiva: jest.Mock;
+  };
+
   beforeEach(async () => {
     nodos = {
       findOne: jest.fn<Promise<Nodo | null>, [unknown]>(),
       save: jest.fn((n: Nodo) => Promise.resolve(n)),
-      create: jest.fn((n: DeepPartial<Nodo>) => n as Nodo),
+      create: jest.fn(
+        (n: DeepPartial<Nodo>) => n as Nodo,
+      ),
       remove: jest.fn((n: Nodo) => Promise.resolve(n)),
     };
+
+    catalogosService = {
+      existeClaveActiva: jest.fn().mockResolvedValue(true),
+    };
+
     const modulo = await Test.createTestingModule({
       providers: [
         NodoService,
-        { provide: getRepositoryToken(Nodo), useValue: nodos },
-        { provide: getRepositoryToken(NodoFoto), useValue: {} },
-        { provide: getRepositoryToken(NodoVoto), useValue: {} },
+        {
+          provide: getRepositoryToken(Nodo),
+          useValue: nodos,
+        },
+        {
+          provide: getRepositoryToken(NodoFoto),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(NodoVoto),
+          useValue: {},
+        },
+        {
+          provide: InsigniasService,
+          useValue: {
+            evaluar: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: NotificacionesService,
+          useValue: {
+            crear: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: CatalogosService,
+          useValue: catalogosService,
+        },
       ],
     }).compile();
+
     service = modulo.get(NodoService);
   });
 
   describe('create', () => {
     it('una empresa publica directo, como patrocinado y con su beneficio', async () => {
       await service.create(
-        dto({ beneficio: '  Cafe gratis con tu ruta  ' }),
+        dto({
+          beneficio: '  Cafe gratis con tu ruta  ',
+        }),
         EMPRESA.id,
         EMPRESA.rol,
       );
+
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
         estado: EstadoNodo.Aprobado,
         patrocinado: true,
@@ -96,8 +153,15 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
     });
 
     it('un beneficio en blanco se guarda como null', async () => {
-      await service.create(dto({ beneficio: '   ' }), EMPRESA.id, EMPRESA.rol);
-      expect(nodos.create.mock.calls[0][0]).toMatchObject({ beneficio: null });
+      await service.create(
+        dto({ beneficio: '   ' }),
+        EMPRESA.id,
+        EMPRESA.rol,
+      );
+
+      expect(nodos.create.mock.calls[0][0]).toMatchObject({
+        beneficio: null,
+      });
     });
 
     it('un deportista tambien publica directo, pero sin patrocinio ni beneficio', async () => {
@@ -106,6 +170,7 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
         7,
         RoleId.UserNormal,
       );
+
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
         estado: EstadoNodo.Aprobado,
         patrocinado: false,
@@ -115,21 +180,72 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
 
     it('sin rol (llamada interna) se trata como deportista', async () => {
       await service.create(dto(), 7);
+
       expect(nodos.create.mock.calls[0][0]).toMatchObject({
         estado: EstadoNodo.Aprobado,
         patrocinado: false,
       });
     });
+
+    it('acepta una categoria dinamica activa', async () => {
+      const categoria = 'categoria_dinamica_adm11';
+
+      await service.create(
+        dto({ categoria }),
+        EMPRESA.id,
+        EMPRESA.rol,
+      );
+
+      expect(
+        catalogosService.existeClaveActiva,
+      ).toHaveBeenCalledWith('nodos', categoria);
+
+      expect(nodos.create.mock.calls[0][0]).toMatchObject({
+        categoria,
+        categoriaOtro: null,
+      });
+    });
+
+    it('rechaza una categoria inexistente o inactiva', async () => {
+      catalogosService.existeClaveActiva.mockResolvedValueOnce(
+        false,
+      );
+
+      await expect(
+        service.create(
+          dto({ categoria: 'categoria_inactiva' }),
+          EMPRESA.id,
+          EMPRESA.rol,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(
+        catalogosService.existeClaveActiva,
+      ).toHaveBeenCalledWith(
+        'nodos',
+        'categoria_inactiva',
+      );
+
+      expect(nodos.create).not.toHaveBeenCalled();
+      expect(nodos.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('actualizar', () => {
     it('la empresa dueña cambia nombre y beneficio', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
       const actualizado = await service.actualizar(
         8,
-        { nombre: 'Cafe Nuevo', beneficio: '2x1 en cafe' },
+        {
+          nombre: 'Cafe Nuevo',
+          beneficio: '2x1 en cafe',
+        },
         EMPRESA,
       );
+
       expect(actualizado).toMatchObject({
         nombre: 'Cafe Nuevo',
         beneficio: '2x1 en cafe',
@@ -137,22 +253,32 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
     });
 
     it('puede quitar el beneficio con un texto vacio', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
       const actualizado = await service.actualizar(
         8,
         { beneficio: '' },
         EMPRESA,
       );
+
       expect(actualizado.beneficio).toBeNull();
     });
 
     it('una descripcion vacia la borra', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa({ descripcion: 'vieja' }));
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa({
+          descripcion: 'vieja',
+        }),
+      );
+
       const actualizado = await service.actualizar(
         8,
         { descripcion: '  ' },
         EMPRESA,
       );
+
       expect(actualizado.descripcion).toBeNull();
     });
 
@@ -163,7 +289,13 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
           categoriaOtro: 'Picnic',
         }),
       );
-      const actualizado = await service.actualizar(8, { nombre: 'X' }, EMPRESA);
+
+      const actualizado = await service.actualizar(
+        8,
+        { nombre: 'X' },
+        EMPRESA,
+      );
+
       expect(actualizado.categoriaOtro).toBe('Picnic');
     });
 
@@ -174,48 +306,136 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
           categoriaOtro: 'Picnic',
         }),
       );
+
       const actualizado = await service.actualizar(
         8,
-        { categoria: CategoriaNodo.Agua },
+        {
+          categoria: CategoriaNodo.Agua,
+        },
         EMPRESA,
       );
+
       expect(actualizado.categoriaOtro).toBeNull();
+
+      expect(
+        catalogosService.existeClaveActiva,
+      ).toHaveBeenCalledWith(
+        'nodos',
+        CategoriaNodo.Agua,
+      );
     });
 
     it('403 si el nodo es de otra empresa', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
       await expect(
-        service.actualizar(8, { nombre: 'X' }, OTRA_EMPRESA),
+        service.actualizar(
+          8,
+          { nombre: 'X' },
+          OTRA_EMPRESA,
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+
       expect(nodos.save).not.toHaveBeenCalled();
     });
 
     it('403 si el nodo no es patrocinado, aunque sea del mismo usuario', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa({ patrocinado: false }));
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa({
+          patrocinado: false,
+        }),
+      );
+
       await expect(
-        service.actualizar(8, { nombre: 'X' }, EMPRESA),
+        service.actualizar(
+          8,
+          { nombre: 'X' },
+          EMPRESA,
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('permite editar otros datos de un nodo con categoria desactivada', async () => {
+      catalogosService.existeClaveActiva.mockResolvedValue(
+        false,
+      );
+
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa({
+          categoria: 'categoria_antigua',
+        }),
+      );
+
+      const actualizado = await service.actualizar(
+        8,
+        { nombre: 'Cafe Actualizado' },
+        EMPRESA,
+      );
+
+      expect(actualizado.nombre).toBe(
+        'Cafe Actualizado',
+      );
+
+      expect(
+        catalogosService.existeClaveActiva,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rechaza cambiar a una categoria desactivada', async () => {
+      catalogosService.existeClaveActiva.mockResolvedValue(
+        false,
+      );
+
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
+      await expect(
+        service.actualizar(
+          8,
+          {
+            categoria: 'categoria_inactiva',
+          },
+          EMPRESA,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(nodos.save).not.toHaveBeenCalled();
     });
   });
 
   describe('eliminar', () => {
     it('la empresa dueña lo da de baja', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
       await service.eliminar(8, EMPRESA);
+
       expect(nodos.remove).toHaveBeenCalledTimes(1);
     });
 
     it('un admin tambien', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
+      );
+
       await service.eliminar(8, ADMIN);
+
       expect(nodos.remove).toHaveBeenCalledTimes(1);
     });
 
     it('403 para otra empresa', async () => {
-      nodos.findOne.mockResolvedValue(nodoDeEmpresa());
-      await expect(service.eliminar(8, OTRA_EMPRESA)).rejects.toBeInstanceOf(
-        ForbiddenException,
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa(),
       );
+
+      await expect(
+        service.eliminar(8, OTRA_EMPRESA),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
       expect(nodos.remove).not.toHaveBeenCalled();
     });
 
@@ -223,11 +443,19 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
       nodos.findOne.mockResolvedValue(
         nodoDeEmpresa({
           patrocinado: false,
-          creadoPor: { id: 7, nombreUser: 'Ana' } as User,
+          creadoPor: {
+            id: 7,
+            nombreUser: 'Ana',
+          } as User,
         }),
       );
+
       await expect(
-        service.eliminar(8, { id: 7, email: 'a@x.co', rol: RoleId.UserNormal }),
+        service.eliminar(8, {
+          id: 7,
+          email: 'a@x.co',
+          rol: RoleId.UserNormal,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });

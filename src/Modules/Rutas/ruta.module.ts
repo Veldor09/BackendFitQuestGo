@@ -1,6 +1,8 @@
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from '../Auth/seguridad.module';
+import { CatalogosModule } from '../Catalogos/catalogos.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
 import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
 import { RutaFavorita } from './ruta-favorita.entity';
@@ -12,6 +14,7 @@ import { RutaService } from './ruta.service';
   imports: [
     TypeOrmModule.forFeature([Ruta, RutaFavorita]),
     SeguridadModule,
+    CatalogosModule,
     NotificacionesModule,
     InsigniasModule,
   ],
@@ -20,4 +23,3 @@ import { RutaService } from './ruta.service';
   exports: [RutaService],
 })
 export class RutaModule {}
-
