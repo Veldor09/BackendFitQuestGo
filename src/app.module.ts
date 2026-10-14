@@ -15,6 +15,7 @@ import { InsigniasModule } from './Modules/Insignias/insignias.module';
 import { EventoModule } from './Modules/Eventos/evento.module';
 import { NodoModule } from './Modules/Nodos/nodo.module';
 import { NotificacionesModule } from './Modules/Notificaciones/notificaciones.module';
+import { ReporteContenidoModule } from './Modules/ReportesContenido/reporte-contenido.module';
 import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
@@ -41,6 +42,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     AuthModule,
     NodoModule,
     RutaModule,
+    ReporteContenidoModule,
     AlertaModule,
     CatalogosModule,
     ClimaModule,
