@@ -60,11 +60,17 @@ describe('UserService — perfil de empresa y foto', () => {
     };
 
     service = new UserService(
-      usuarios as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      fotos as never,
+      usuarios as never, // 1. User
+      {} as never,       // 2. Role
+      {} as never,       // 3. ContrasenasServicio
+      {} as never,       // 4. InsigniasService
+      fotos as never,    // 5. UsuarioFoto
+      {} as never,       // 6. Ruta
+      {} as never,       // 7. RutaFavorita
+      {} as never,       // 8. Nodo
+      {} as never,       // 9. NodoVoto
+      {} as never,       // 10. Alerta
+      {} as never,       // 11. AlertaVoto
     );
   });
 
