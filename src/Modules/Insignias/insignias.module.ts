@@ -1,9 +1,13 @@
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { SeguridadModule } from '../Auth/seguridad.module';
 import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
+
 import { Insignia } from './insignia.entity';
 import {
+  AdminInsigniasController,
   InsigniasController,
   UsuarioInsigniasController,
 } from './insignias.controller';
@@ -16,7 +20,11 @@ import { UsuarioInsignia } from './usuario-insignia.entity';
     SeguridadModule,
     NotificacionesModule,
   ],
-  controllers: [InsigniasController, UsuarioInsigniasController],
+  controllers: [
+    InsigniasController,
+    AdminInsigniasController,
+    UsuarioInsigniasController,
+  ],
   providers: [InsigniasService],
   exports: [InsigniasService, TypeOrmModule],
 })
