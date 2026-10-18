@@ -19,6 +19,7 @@ import { ReporteContenidoModule } from './Modules/ReportesContenido/reporte-cont
 import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
+import { DashboardModule } from './Modules/Dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { UserModule } from './Modules/Usuarios/user.module';
     AlertaModule,
     CatalogosModule,
     ClimaModule,
+    DashboardModule,
     NotificacionesModule,
     InsigniasModule,
     EventoModule,
