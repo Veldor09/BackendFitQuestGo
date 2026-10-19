@@ -50,3 +50,12 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+# Database and temporary source backups
+*.dump
+*.bak
+
+# Archivos compilados del script de migración ADM-10
+scripts/run-insignias-migration.js
+scripts/run-insignias-migration.js.map
+scripts/run-insignias-migration.d.ts
