@@ -3,6 +3,7 @@ export enum CategoriaNotificacion {
   Alertas = 'alertas',
   Insignias = 'insignias',
   Eventos = 'eventos',
+  Patrocinio = 'patrocinio',
 }
 
 export enum ReferenciaTipoNotificacion {
@@ -10,4 +11,5 @@ export enum ReferenciaTipoNotificacion {
   Alerta = 'alerta',
   Insignia = 'insignia',
   Nodo = 'nodo',
+  Suscripcion = 'suscripcion',
 }

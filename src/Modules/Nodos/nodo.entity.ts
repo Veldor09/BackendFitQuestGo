@@ -54,6 +54,13 @@ export class Nodo {
   @Column({ type: 'boolean', default: false })
   patrocinado: boolean;
 
+  // Interruptor del dueño para destacar este punto. Que se vea destacado ademas
+  // exige un plan vigente y que el punto siga visible: se calcula al leer (ver
+  // `DestacadosService`). Opcional en el tipo para no romper a quien arma
+  // puntos a mano (las pruebas); en la base siempre vale true o false.
+  @Column({ name: 'destacar_activado', type: 'boolean', default: false })
+  destacarActivado?: boolean;
+
   @Column({ type: 'varchar', length: 20, default: EstadoNodo.Pendiente })
   estado: EstadoNodo;
 

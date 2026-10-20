@@ -1,10 +1,10 @@
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from '../Auth/seguridad.module';
 import { CatalogosModule } from '../Catalogos/catalogos.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
 import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
+import { PatrocinioModule } from '../Patrocinio/patrocinio.module';
 import { Nodo } from './nodo.entity';
 import { NodoFoto } from './nodo-foto.entity';
 import { NodoVoto } from './nodo-voto.entity';
@@ -18,6 +18,7 @@ import { NodoService } from './nodo.service';
     CatalogosModule,
     InsigniasModule,
     NotificacionesModule,
+    PatrocinioModule,
   ],
   controllers: [NodoController],
   providers: [NodoService],

@@ -6,6 +6,7 @@ import {
   NotificacionRespuestaDto,
 } from './dto/notificacion.dto';
 import { Notificacion } from './notificacion.entity';
+import { ReferenciaTipoNotificacion } from './notificacion.enum';
 
 @Injectable()
 export class NotificacionesService {
@@ -37,6 +38,22 @@ export class NotificacionesService {
       );
       return null;
     }
+  }
+
+  /**
+   * Ya existe una notificacion de este usuario, sobre esta referencia y con
+   * este titulo: sirve para no repetir avisos programados (p. ej. "por vencer").
+   */
+  async yaAvisada(
+    idUsuario: number,
+    referenciaTipo: ReferenciaTipoNotificacion,
+    referenciaId: number,
+    titulo: string,
+  ): Promise<boolean> {
+    const cantidad = await this.notificacionRepo.count({
+      where: { idUsuario, referenciaTipo, referenciaId, titulo },
+    });
+    return cantidad > 0;
   }
 
   async findMisNotificaciones(
