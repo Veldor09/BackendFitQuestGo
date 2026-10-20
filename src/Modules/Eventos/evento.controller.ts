@@ -1,3 +1,4 @@
+
 import {
   Body,
   Controller,
@@ -38,6 +39,19 @@ export class EventoController {
   @Roles(RoleId.Empresa)
   findMios(@UsuarioActual() actual: UsuarioAutenticado): Promise<Evento[]> {
     return this.eventoService.findMios(actual.id);
+  }
+
+  /**
+   * ADM-08: listado completo para administradores.
+   * Incluye eventos futuros, en curso y finalizados.
+   *
+   * Debe declararse antes de @Get(':id').
+   */
+  @Get('admin/todos')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodosAdmin(): Promise<Evento[]> {
+    return this.eventoService.findTodosAdmin();
   }
 
   @Get(':id')

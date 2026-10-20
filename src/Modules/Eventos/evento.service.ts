@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -39,6 +40,18 @@ export class EventoService {
   findMios(usuarioId: number): Promise<Evento[]> {
     return this.eventoRepository.find({
       where: { creadoPor: { id: usuarioId } },
+      order: { fechaInicio: 'DESC', id: 'DESC' },
+    });
+  }
+
+  /**
+   * ADM-08: listado administrativo de todos los eventos.
+   * Incluye eventos futuros, en curso y finalizados.
+   *
+   * La autorizacion de administrador se valida en el controlador.
+   */
+  findTodosAdmin(): Promise<Evento[]> {
+    return this.eventoRepository.find({
       order: { fechaInicio: 'DESC', id: 'DESC' },
     });
   }
