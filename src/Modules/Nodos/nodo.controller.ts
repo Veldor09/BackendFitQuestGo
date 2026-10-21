@@ -110,10 +110,8 @@ export class NodoController {
     return this.nodoService.create(dto, actual.id, actual.rol);
   }
 
-  /** Editar un Nodo de Abastecimiento propio (modulo 5). */
+  /** Editar un punto propio: de una empresa (modulo 5) o de un deportista. */
   @Patch(':id')
-  @UseGuards(GuardiaRoles)
-  @Roles(RoleId.Empresa)
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarNodoDto,
@@ -122,7 +120,7 @@ export class NodoController {
     return this.nodoService.actualizar(id, dto, actual);
   }
 
-  /** Dar de baja un Nodo de Abastecimiento: su empresa o un admin. */
+  /** Dar de baja un punto: quien lo creo o un admin. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   eliminar(

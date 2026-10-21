@@ -341,20 +341,18 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
       expect(nodos.save).not.toHaveBeenCalled();
     });
 
-    it('403 si el nodo no es patrocinado, aunque sea del mismo usuario', async () => {
+    it('el dueno de un punto normal (no patrocinado) lo edita y se guarda directo', async () => {
       nodos.findOne.mockResolvedValue(
         nodoDeEmpresa({
           patrocinado: false,
         }),
       );
 
-      await expect(
-        service.actualizar(
-          8,
-          { nombre: 'X' },
-          EMPRESA,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await service.actualizar(8, { nombre: 'X' }, EMPRESA);
+
+      expect(nodos.save).toHaveBeenCalledWith(
+        expect.objectContaining({ nombre: 'X' }),
+      );
     });
 
     it('permite editar otros datos de un nodo con categoria desactivada', async () => {
@@ -439,7 +437,27 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
       expect(nodos.remove).not.toHaveBeenCalled();
     });
 
-    it('403 para un deportista que propuso un punto normal (no es patrocinado)', async () => {
+    it('un deportista elimina el punto normal que el propuso', async () => {
+      nodos.findOne.mockResolvedValue(
+        nodoDeEmpresa({
+          patrocinado: false,
+          creadoPor: {
+            id: 7,
+            nombreUser: 'Ana',
+          } as User,
+        }),
+      );
+
+      await service.eliminar(8, {
+        id: 7,
+        email: 'a@x.co',
+        rol: RoleId.UserNormal,
+      });
+
+      expect(nodos.remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('403 para un deportista que intenta eliminar el punto de otro', async () => {
       nodos.findOne.mockResolvedValue(
         nodoDeEmpresa({
           patrocinado: false,
@@ -452,11 +470,12 @@ describe('NodoService — nodos patrocinados (modulo 5)', () => {
 
       await expect(
         service.eliminar(8, {
-          id: 7,
-          email: 'a@x.co',
+          id: 9,
+          email: 'b@x.co',
           rol: RoleId.UserNormal,
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(nodos.remove).not.toHaveBeenCalled();
     });
   });
 });

@@ -234,7 +234,10 @@ export class NodoService {
     return guardado;
   }
 
-  /** Edita un nodo propio. Solo cuentas Empresa sobre sus nodos patrocinados. */
+  /**
+   * Edita un nodo propio, sea de una empresa (patrocinado) o de un deportista.
+   * Se guarda directo: no vuelve a la cola de moderacion.
+   */
   async actualizar(
     id: number,
     dto: ActualizarNodoDto,
@@ -242,7 +245,7 @@ export class NodoService {
   ): Promise<Nodo> {
     const nodo = await this.findOne(id);
 
-    if (!nodo.patrocinado || nodo.creadoPor.id !== actual.id) {
+    if (nodo.creadoPor.id !== actual.id) {
       throw new ForbiddenException('Este nodo no te pertenece');
     }
 
@@ -274,11 +277,11 @@ export class NodoService {
     return this.nodoRepository.save(nodo);
   }
 
-  /** Baja de un nodo patrocinado: su empresa o un admin. */
+  /** Baja de un nodo: quien lo creo (empresa o deportista) o un admin. */
   async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
     const nodo = await this.findOne(id);
 
-    const esSuyo = nodo.patrocinado && nodo.creadoPor.id === actual.id;
+    const esSuyo = nodo.creadoPor.id === actual.id;
 
     if (!esSuyo && !esAdmin(actual)) {
       throw new ForbiddenException('Este nodo no te pertenece');

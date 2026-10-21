@@ -9,6 +9,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { opcionesConexion } from './db-options';
 import { AlertaModule } from './Modules/Alertas/alerta.module';
 import { AuthModule } from './Modules/Auth/auth.module';
+import { CalificacionModule } from './Modules/Calificaciones/calificacion.module';
 import { CatalogosModule } from './Modules/Catalogos/catalogos.module';
 import { ClimaModule } from './Modules/Clima/clima.module';
 import { InsigniasModule } from './Modules/Insignias/insignias.module';
@@ -51,6 +52,7 @@ import { DashboardModule } from './Modules/Dashboard/dashboard.module';
     NotificacionesModule,
     InsigniasModule,
     EventoModule,
+    CalificacionModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
