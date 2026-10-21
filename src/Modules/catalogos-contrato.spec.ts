@@ -1,5 +1,6 @@
 import { TipoAlerta } from './Alertas/tipo-alerta.enum';
 import { CategoriaNodo } from './Nodos/categoria-nodo.enum';
+import { MONEDAS } from './Patrocinio/monedas';
 import { ActividadRuta } from './Rutas/actividad-ruta.enum';
 
 /**
@@ -47,6 +48,16 @@ describe('claves de las listas cerradas', () => {
       'parqueo',
       'primeros_auxilios',
       'otro',
+    ]);
+  });
+
+  // La misma lista esta en `test/catalogos_test.dart` de la app (`lib/core/
+  // catalogos/monedas.dart`): el simbolo y los decimales tambien son contrato.
+  it('monedas (codigo, simbolo, decimales)', () => {
+    expect(MONEDAS.map((m) => [m.codigo, m.simbolo, m.decimales])).toEqual([
+      ['CRC', '₡', 0],
+      ['USD', 'US$', 2],
+      ['EUR', '€', 2],
     ]);
   });
 });

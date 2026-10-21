@@ -23,6 +23,12 @@ import { GuardiaRoles } from '../Auth/guards/roles.guard';
 import { Roles } from '../Auth/decorators/roles.decorator';
 import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import { DestacadosService } from '../Patrocinio/destacados.service';
+import type {
+  ConDestacado,
+  ResultadoDestacar,
+} from '../Patrocinio/destacados.service';
+import { DestacarDto } from '../Patrocinio/dto/destacar.dto';
 import { RoleId } from '../Usuarios/roles.enum';
 import {
   ActualizarNodoDto,
@@ -37,22 +43,44 @@ import { NodoConVotos, NodoService } from './nodo.service';
 @Controller('nodos')
 @UseGuards(GuardiaJwt)
 export class NodoController {
-  constructor(private readonly nodoService: NodoService) {}
+  constructor(
+    private readonly nodoService: NodoService,
+    private readonly destacados: DestacadosService,
+  ) {}
 
   /**
    * Pines del mapa (HOM-01): cualquier usuario autenticado los ve, con el
-   * recuento de votos y el suyo.
+   * recuento de votos y el suyo, y `destacado` (los destacados primero).
    */
   @Get()
-  findAprobados(
+  async findAprobados(
     @UsuarioActual() actual: UsuarioAutenticado,
-  ): Promise<NodoConVotos[]> {
-    return this.nodoService.findAprobados(actual.id, actual.rol);
+  ): Promise<ConDestacado<NodoConVotos>[]> {
+    return this.destacados.nodosConDestacado(
+      await this.nodoService.findAprobados(actual.id, actual.rol),
+    );
   }
 
   @Get('mios')
-  findMisNodos(@UsuarioActual() actual: UsuarioAutenticado): Promise<Nodo[]> {
-    return this.nodoService.findMisNodos(actual.id);
+  async findMisNodos(
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<ConDestacado<Nodo>[]> {
+    return this.destacados.nodosConDestacado(
+      await this.nodoService.findMisNodos(actual.id),
+    );
+  }
+
+  /**
+   * Enciende o apaga "Destacar" en un punto propio. 403 con `DESTACAR_SIN_PLAN`,
+   * `DESTACAR_TOPE` o `DESTACAR_NO_ELEGIBLE` si no se puede encender.
+   */
+  @Patch(':id/destacar')
+  destacar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: DestacarDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<ResultadoDestacar> {
+    return this.destacados.destacarNodo(id, actual, dto.destacar);
   }
 
   @Get('pendientes')
@@ -149,23 +177,27 @@ export class NodoController {
    */
   @Patch(':id/confirmar')
   @HttpCode(HttpStatus.OK)
-  confirmar(
+  async confirmar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: VotarNodoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
-  ): Promise<NodoConVotos> {
-    return this.nodoService.confirmar(id, actual.id, dto, actual.rol);
+  ): Promise<ConDestacado<NodoConVotos>> {
+    return this.destacados.nodoConDestacado(
+      await this.nodoService.confirmar(id, actual.id, dto, actual.rol),
+    );
   }
 
   /** NOD-04 "Ya no existe": mismas reglas que "Sigue ahi"; con 3 votos sale del mapa. */
   @Patch(':id/obsoleto')
   @HttpCode(HttpStatus.OK)
-  marcarObsoleto(
+  async marcarObsoleto(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: VotarNodoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
-  ): Promise<NodoConVotos> {
-    return this.nodoService.marcarObsoleto(id, actual.id, dto, actual.rol);
+  ): Promise<ConDestacado<NodoConVotos>> {
+    return this.destacados.nodoConDestacado(
+      await this.nodoService.marcarObsoleto(id, actual.id, dto, actual.rol),
+    );
   }
 
   /** Aprobar / rechazar (ADM-07): solo admin. */

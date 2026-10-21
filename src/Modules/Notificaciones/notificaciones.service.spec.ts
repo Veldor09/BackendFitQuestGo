@@ -64,6 +64,25 @@ describe('NotificacionesService', () => {
     expect(repo.save).not.toHaveBeenCalled();
   });
 
+  it('yaAvisada es verdadera si ya hay una notificacion con ese usuario, referencia y titulo', async () => {
+    repo.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+    await expect(
+      service.yaAvisada(5, ReferenciaTipoNotificacion.Suscripcion, 9, 'Tu plan vence'),
+    ).resolves.toBe(true);
+    expect(repo.count).toHaveBeenCalledWith({
+      where: {
+        idUsuario: 5,
+        referenciaTipo: ReferenciaTipoNotificacion.Suscripcion,
+        referenciaId: 9,
+        titulo: 'Tu plan vence',
+      },
+    });
+    await expect(
+      service.yaAvisada(5, ReferenciaTipoNotificacion.Suscripcion, 9, 'Otro'),
+    ).resolves.toBe(false);
+  });
+
   it('debe arrojar NotFoundException si un usuario intenta borrar una notificación ajena o inexistente', async () => {
     repo.findOne.mockResolvedValue(null);
 

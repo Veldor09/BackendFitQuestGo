@@ -51,6 +51,10 @@ export class Evento {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   recorridos: ZonaEvento[];
 
+  // Interruptor de la empresa para destacar este evento (ver `Nodo.destacarActivado`).
+  @Column({ name: 'destacar_activado', type: 'boolean', default: false })
+  destacarActivado?: boolean;
+
   @SoloAutorPublico()
   @ManyToOne(() => User, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creado_por' })
