@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -15,6 +15,8 @@ import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from '../Usuarios/roles.enum';
 import { CambiarEstadoRutaDto, CrearRutaDto } from './dto/RutaDTO';
+import { CrearRecorridoDto } from './dto/CrearRecorridoDTO';
+import { RecorridoRuta } from './recorrido-ruta.entity';
 import { Ruta } from './ruta.entity';
 import { RutaService } from './ruta.service';
 
@@ -98,5 +100,15 @@ export class RutaController {
     @Body() dto: CambiarEstadoRutaDto,
   ): Promise<Ruta> {
     return this.rutaService.cambiarEstado(id, dto.estado);
+  }
+
+  /** Registrar recorrido de una ruta completada (RTE-08). */
+  @Post(':id/recorridos')
+  registrarRecorrido(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearRecorridoDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<RecorridoRuta> {
+    return this.rutaService.registrarRecorrido(id, actual.id, dto);
   }
 }

@@ -569,16 +569,12 @@ export class InsigniasService {
   ): Promise<MetricasUsuario> {
     const rutasRes = await this.insigniaRepo.manager.query(
       `
-      SELECT
-        COALESCE(
-          SUM(CAST(r."distancia_km" AS float)),
-          0
-        ) AS km,
-        COUNT(r.id)::int AS rutas
-      FROM rutas r
-      WHERE r.creado_por = $1
-        AND r.estado != $2
-      `,
+        SELECT
+          COALESCE((SELECT SUM(CAST(distancia_km AS float)) FROM recorridos_rutas WHERE usuario_id = $1), 0) +
+          COALESCE((SELECT SUM(CAST(distancia_km AS float)) FROM rutas WHERE creado_por = $1 AND estado != $2), 0) AS km,
+          COALESCE((SELECT COUNT(id)::int FROM recorridos_rutas WHERE usuario_id = $1), 0) +
+          COALESCE((SELECT COUNT(id)::int FROM rutas WHERE creado_por = $1 AND estado != $2), 0) AS rutas
+        `,
       [usuarioId, 'Rechazada'],
     );
 

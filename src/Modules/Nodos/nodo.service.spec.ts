@@ -224,7 +224,7 @@ describe('NodoService', () => {
       });
     });
 
-    it('notifica al usuario cuando se crea el punto de interés y queda en revisión', async () => {
+    it('notifica al usuario cuando se crea el punto de interés y queda publicado', async () => {
       const nuevoNodo = nodo({
         id: 50,
         nombre: 'Mirador del Sol',
@@ -241,7 +241,7 @@ describe('NodoService', () => {
         expect.objectContaining({
           idUsuario: AUTOR,
           categoria: CategoriaNotificacion.Eventos,
-          titulo: 'Punto de interés enviado a revisión',
+          titulo: 'Punto de interés creado con éxito',
           referenciaTipo: ReferenciaTipoNotificacion.Nodo,
           referenciaId: 50,
         }),
