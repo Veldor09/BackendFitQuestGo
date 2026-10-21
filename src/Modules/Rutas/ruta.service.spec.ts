@@ -251,3 +251,58 @@ catalogosService as unknown as CatalogosService,
     expect(rutas.save).not.toHaveBeenCalled();
   });
 });
+
+
+describe('RutaService.registrarRecorrido (POST /rutas/:id/recorridos)', () => {
+  let service: RutaService;
+  let rutas: { findOne: jest.Mock };
+  let recorridos: { create: jest.Mock; save: jest.Mock };
+  let insignias: { evaluar: jest.Mock };
+
+  beforeEach(() => {
+    rutas = { findOne: jest.fn() };
+    recorridos = {
+      create: jest.fn((dto) => dto),
+      save: jest.fn((dto) => Promise.resolve({ id: 1, ...dto })),
+    };
+    insignias = { evaluar: jest.fn().mockResolvedValue(undefined) };
+
+    service = new RutaService(
+      rutas as any,
+      {} as any,
+      insignias as any,
+      {} as any,
+      {} as any,
+      recorridos as any,
+    );
+  });
+
+  it('404 si la ruta no existe', async () => {
+    rutas.findOne.mockResolvedValue(null);
+    await expect(
+      service.registrarRecorrido(5, 7, {
+        distanciaKm: 4.2,
+        duracionSegundos: 1200,
+        iniciadoEn: new Date().toISOString(),
+        finalizadoEn: new Date().toISOString(),
+        puntos: [{ lat: 10, lng: -85 }],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('guarda el recorrido y evalua insignias', async () => {
+    rutas.findOne.mockResolvedValue(ruta(EstadoRuta.Publicada));
+    const res = await service.registrarRecorrido(5, 7, {
+      distanciaKm: 4.2,
+      duracionSegundos: 1200,
+      iniciadoEn: new Date().toISOString(),
+      finalizadoEn: new Date().toISOString(),
+      puntos: [{ lat: 10, lng: -85 }],
+    });
+
+    expect(recorridos.create).toHaveBeenCalled();
+    expect(recorridos.save).toHaveBeenCalled();
+    expect(insignias.evaluar).toHaveBeenCalledWith(7);
+    expect(res.distanciaKm).toBe(4.2);
+  });
+});

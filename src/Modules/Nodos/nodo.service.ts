@@ -211,8 +211,8 @@ export class NodoService {
       await this.notificacionesService.crear({
         idUsuario: usuarioId,
         categoria: CategoriaNotificacion.Eventos,
-        titulo: 'Punto de interés enviado a revisión',
-        mensaje: `Tu propuesta de punto de interés "${guardado.nombre}" fue enviada al equipo de moderación.`,
+        titulo: 'Punto de interés creado con éxito',
+        mensaje: `Tu punto de interés "${guardado.nombre}" ha sido publicado y ya aparece en el mapa.`,
         referenciaTipo: ReferenciaTipoNotificacion.Nodo,
         referenciaId: guardado.id,
       });

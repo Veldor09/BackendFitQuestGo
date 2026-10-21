@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -23,6 +24,8 @@ import { CrearRutaDto } from './dto/RutaDTO';
 import { EstadoRuta } from './estado-ruta.enum';
 import { RutaFavorita } from './ruta-favorita.entity';
 import { Ruta } from './ruta.entity';
+import { RecorridoRuta } from './recorrido-ruta.entity';
+import { CrearRecorridoDto } from './dto/CrearRecorridoDTO';
 
 @Injectable()
 export class RutaService {
@@ -36,6 +39,9 @@ export class RutaService {
     private readonly insigniasService: InsigniasService,
     private readonly notificacionesService: NotificacionesService,
     private readonly catalogosService: CatalogosService,
+    @Optional()
+    @InjectRepository(RecorridoRuta)
+    private readonly recorridoRepository?: Repository<RecorridoRuta>,
   ) {}
 
   /**
@@ -350,5 +356,44 @@ export class RutaService {
     }
 
     return actualizada;
+  }
+
+
+  /** Registrar recorrido de una ruta completada por un usuario (RTE-08). */
+  async registrarRecorrido(
+    rutaId: number,
+    usuarioId: number,
+    dto: CrearRecorridoDto,
+  ): Promise<RecorridoRuta> {
+    const ruta = await this.rutaRepository.findOne({ where: { id: rutaId } });
+    if (!ruta) {
+      throw new NotFoundException(`Ruta con ID ${rutaId} no encontrada`);
+    }
+
+    const repo = this.recorridoRepository;
+    if (!repo) throw new Error("recorridoRepository no disponible");
+    const recorrido = repo.create({
+      rutaId,
+      usuarioId,
+      distanciaKm: dto.distanciaKm,
+      duracionSegundos: dto.duracionSegundos,
+      iniciadoEn: new Date(dto.iniciadoEn),
+      finalizadoEn: new Date(dto.finalizadoEn),
+      puntos: dto.puntos ?? [],
+    });
+
+    if (!this.recorridoRepository) throw new Error("recorridoRepository no disponible");
+    const guardado = await repo.save(recorrido);
+
+    // Evaluar insignias tras completar un recorrido
+    try {
+      await this.insigniasService.evaluar(usuarioId);
+    } catch (error) {
+      this.logger.error(
+        `Error al evaluar insignias tras registrar recorrido para usuario ${usuarioId}: ${error.message}`,
+      );
+    }
+
+    return guardado;
   }
 }
