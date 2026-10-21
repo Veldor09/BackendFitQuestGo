@@ -1,3 +1,4 @@
+
 import {
   Body,
   Controller,
@@ -68,6 +69,19 @@ export class EventoController {
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<ResultadoDestacar> {
     return this.destacados.destacarEvento(id, actual, dto.destacar);
+  }
+
+  /**
+   * ADM-08: listado completo para administradores.
+   * Incluye eventos futuros, en curso y finalizados.
+   *
+   * Debe declararse antes de @Get(':id').
+   */
+  @Get('admin/todos')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodosAdmin(): Promise<Evento[]> {
+    return this.eventoService.findTodosAdmin();
   }
 
   @Get(':id')

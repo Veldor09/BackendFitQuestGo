@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -19,16 +20,19 @@ const EMPRESA: UsuarioAutenticado = {
   email: 'cafe@x.co',
   rol: RoleId.Empresa,
 };
+
 const OTRA: UsuarioAutenticado = {
   id: 21,
   email: 'bici@x.co',
   rol: RoleId.Empresa,
 };
+
 const ADMIN: UsuarioAutenticado = {
   id: 1,
   email: 'adm@x.co',
   rol: RoleId.Admin,
 };
+
 const DEPORTISTA: UsuarioAutenticado = {
   id: 7,
   email: 'ana@x.co',
@@ -46,6 +50,7 @@ const area = (nombre = 'Zona de salida') => ({
     { lat: 10.001, lng: -84.001 },
   ],
 });
+
 const recorrido = (nombre = 'Caminata 5k') => ({
   nombre,
   puntos: [
@@ -80,6 +85,7 @@ const evento = (parcial: Partial<Evento> = {}): Evento => ({
 
 describe('EventoService', () => {
   let service: EventoService;
+
   let eventos: {
     find: jest.Mock<Promise<Evento[]>, [unknown]>;
     findOne: jest.Mock<Promise<Evento | null>, [unknown]>;
@@ -96,12 +102,14 @@ describe('EventoService', () => {
       create: jest.fn((e: DeepPartial<Evento>) => e as Evento),
       remove: jest.fn((e: Evento) => Promise.resolve(e)),
     };
+
     const modulo = await Test.createTestingModule({
       providers: [
         EventoService,
         { provide: getRepositoryToken(Evento), useValue: eventos },
       ],
     }).compile();
+
     service = modulo.get(EventoService);
   });
 
@@ -111,13 +119,16 @@ describe('EventoService', () => {
         dto({ nombre: '  Evento Benefico  ', descripcion: ' Por la escuela ' }),
         EMPRESA.id,
       );
+
       const guardado = eventos.create.mock.calls[0][0];
+
       expect(guardado).toMatchObject({
         nombre: 'Evento Benefico',
         descripcion: 'Por la escuela',
         categoria: CategoriaEvento.Benefico,
         creadoPor: { id: EMPRESA.id },
       });
+
       expect(guardado.areas).toHaveLength(1);
       expect(guardado.recorridos).toHaveLength(1);
       expect(eventos.save).toHaveBeenCalledTimes(1);
@@ -127,6 +138,7 @@ describe('EventoService', () => {
       await expect(
         service.create(dto({ areas: undefined }), EMPRESA.id),
       ).resolves.toBeDefined();
+
       await expect(
         service.create(dto({ recorridos: undefined }), EMPRESA.id),
       ).resolves.toBeDefined();
@@ -140,7 +152,9 @@ describe('EventoService', () => {
         }),
         EMPRESA.id,
       );
+
       const guardado = eventos.create.mock.calls[0][0];
+
       expect(guardado.areas).toHaveLength(2);
       expect(guardado.recorridos).toHaveLength(3);
     });
@@ -149,20 +163,24 @@ describe('EventoService', () => {
       await expect(
         service.create(dto({ areas: [], recorridos: [] }), EMPRESA.id),
       ).rejects.toBeInstanceOf(BadRequestException);
+
       await expect(
         service.create(
           dto({ areas: undefined, recorridos: undefined }),
           EMPRESA.id,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+
       expect(eventos.save).not.toHaveBeenCalled();
     });
 
     it('rechaza una fecha de fin igual o anterior a la de inicio', async () => {
       const inicio = enHoras(24);
+
       await expect(
         service.create(dto({ fechaInicio: inicio, fechaFin: inicio }), 20),
       ).rejects.toBeInstanceOf(BadRequestException);
+
       await expect(
         service.create(dto({ fechaInicio: inicio, fechaFin: enHoras(20) }), 20),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -195,8 +213,11 @@ describe('EventoService', () => {
           { lat: 10.1, lng: -84.1, extra: 'z' },
         ],
       };
+
       await service.create(dto({ areas: [conExtra] }), EMPRESA.id);
+
       const punto = eventos.create.mock.calls[0][0].areas?.[0]?.puntos?.[0];
+
       expect(punto).toEqual({ lat: 10, lng: -84 });
     });
   });
@@ -204,25 +225,76 @@ describe('EventoService', () => {
   describe('findVigentes / findMios', () => {
     it('lista solo lo que no ha terminado, el mas proximo primero', async () => {
       await service.findVigentes();
+
       const opciones = eventos.find.mock.calls[0][0] as {
         where: { fechaFin: FindOperator<Date> };
         order: Record<string, string>;
       };
+
       expect(opciones.where.fechaFin.type).toBe('moreThanOrEqual');
       expect(opciones.order.fechaInicio).toBe('ASC');
     });
 
     it('la empresa ve todos los suyos, tambien los terminados', async () => {
       await service.findMios(EMPRESA.id);
+
       expect(eventos.find.mock.calls[0][0]).toMatchObject({
         where: { creadoPor: { id: EMPRESA.id } },
       });
     });
   });
 
+  describe('findTodosAdmin (ADM-08)', () => {
+    it('lista todos los eventos sin filtrar por fecha ni empresa', async () => {
+      const registros = [
+        evento({
+          id: 1,
+          nombre: 'Evento finalizado',
+          fechaInicio: enHoras(-72),
+          fechaFin: enHoras(-48),
+        }),
+        evento({
+          id: 2,
+          nombre: 'Evento en curso',
+          fechaInicio: enHoras(-2),
+          fechaFin: enHoras(2),
+        }),
+        evento({
+          id: 3,
+          nombre: 'Evento proximo',
+          fechaInicio: enHoras(48),
+          fechaFin: enHoras(72),
+          creadoPor: { id: OTRA.id } as User,
+        }),
+      ];
+
+      eventos.find.mockResolvedValue(registros);
+
+      const resultado = await service.findTodosAdmin();
+
+      expect(resultado).toEqual(registros);
+      expect(resultado).toHaveLength(3);
+      expect(eventos.find).toHaveBeenCalledTimes(1);
+
+      expect(eventos.find).toHaveBeenCalledWith({
+        order: {
+          fechaInicio: 'DESC',
+          id: 'DESC',
+        },
+      });
+
+      const opciones = eventos.find.mock.calls[0][0] as {
+        where?: unknown;
+      };
+
+      expect(opciones.where).toBeUndefined();
+    });
+  });
+
   describe('findOne', () => {
     it('404 si no existe', async () => {
       eventos.findOne.mockResolvedValue(null);
+
       await expect(service.findOne(99)).rejects.toBeInstanceOf(
         NotFoundException,
       );
@@ -232,11 +304,13 @@ describe('EventoService', () => {
   describe('actualizar', () => {
     it('cambia solo lo que se envia', async () => {
       eventos.findOne.mockResolvedValue(evento());
+
       const actualizado = await service.actualizar(
         3,
         { nombre: 'Caminata Nueva' },
         EMPRESA,
       );
+
       expect(actualizado.nombre).toBe('Caminata Nueva');
       expect(actualizado.areas).toHaveLength(1);
       expect(actualizado.recorridos).toHaveLength(1);
@@ -244,21 +318,31 @@ describe('EventoService', () => {
 
     it('permite quitar el area si queda al menos un recorrido', async () => {
       eventos.findOne.mockResolvedValue(evento());
-      const actualizado = await service.actualizar(3, { areas: [] }, EMPRESA);
+
+      const actualizado = await service.actualizar(
+        3,
+        { areas: [] },
+        EMPRESA,
+      );
+
       expect(actualizado.areas).toHaveLength(0);
     });
 
     it('no permite dejar el evento sin area ni recorrido', async () => {
       eventos.findOne.mockResolvedValue(evento());
+
       await expect(
         service.actualizar(3, { areas: [], recorridos: [] }, EMPRESA),
       ).rejects.toBeInstanceOf(BadRequestException);
+
       expect(eventos.save).not.toHaveBeenCalled();
     });
 
     it('valida las fechas contra las que ya tenia el evento', async () => {
       const existente = evento({ fechaInicio: enHoras(24) });
+
       eventos.findOne.mockResolvedValue(existente);
+
       await expect(
         service.actualizar(3, { fechaFin: enHoras(10) }, EMPRESA),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -266,9 +350,11 @@ describe('EventoService', () => {
 
     it('403 si el evento es de otra empresa', async () => {
       eventos.findOne.mockResolvedValue(evento());
+
       await expect(
         service.actualizar(3, { nombre: 'X' }, OTRA),
       ).rejects.toBeInstanceOf(ForbiddenException);
+
       expect(eventos.save).not.toHaveBeenCalled();
     });
   });
@@ -276,24 +362,31 @@ describe('EventoService', () => {
   describe('eliminar', () => {
     it('la empresa dueña lo borra', async () => {
       eventos.findOne.mockResolvedValue(evento());
+
       await service.eliminar(3, EMPRESA);
+
       expect(eventos.remove).toHaveBeenCalledTimes(1);
     });
 
     it('un admin puede borrar el de cualquier empresa', async () => {
       eventos.findOne.mockResolvedValue(evento());
+
       await service.eliminar(3, ADMIN);
+
       expect(eventos.remove).toHaveBeenCalledTimes(1);
     });
 
     it('403 para otra empresa y para un deportista', async () => {
       eventos.findOne.mockResolvedValue(evento());
-      await expect(service.eliminar(3, OTRA)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      await expect(service.eliminar(3, DEPORTISTA)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+
+      await expect(
+        service.eliminar(3, OTRA),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      await expect(
+        service.eliminar(3, DEPORTISTA),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
       expect(eventos.remove).not.toHaveBeenCalled();
     });
   });
