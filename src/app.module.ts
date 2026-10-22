@@ -20,6 +20,7 @@ import { RutaModule } from './Modules/Rutas/ruta.module';
 import { RoleModule } from './Modules/Usuarios/roles.module';
 import { UserModule } from './Modules/Usuarios/user.module';
 import { DashboardModule } from './Modules/Dashboard/dashboard.module';
+import { AuditoriaModule } from './Modules/Auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { DashboardModule } from './Modules/Dashboard/dashboard.module';
     CatalogosModule,
     ClimaModule,
     DashboardModule,
+    AuditoriaModule,
     NotificacionesModule,
     InsigniasModule,
     EventoModule,

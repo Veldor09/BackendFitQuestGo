@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   ConflictException,
@@ -8,7 +7,7 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 
 import { ContrasenasServicio } from '../Auth/services/contrasenas.service';
 import { InsigniasService } from '../Insignias/insignias.service';
@@ -77,8 +76,15 @@ export class UserService {
     });
   }
 
-  async findOneUser(id: number): Promise<User> {
-    const user = await this.userRepository.findOneBy({ id });
+  async findOneUser(
+    id: number,
+    manager?: EntityManager,
+  ): Promise<User> {
+    const repository = manager
+      ? manager.getRepository(User)
+      : this.userRepository;
+
+    const user = await repository.findOneBy({ id });
 
     if (!user) {
       throw new NotFoundException(
@@ -89,27 +95,39 @@ export class UserService {
     return user;
   }
 
-  async createUser(dto: CreateUserDto): Promise<User> {
-    const user = this.userRepository.create(dto);
+  async createUser(
+    dto: CreateUserDto,
+    manager?: EntityManager,
+  ): Promise<User> {
+    const repository = manager
+      ? manager.getRepository(User)
+      : this.userRepository;
+
+    const user = repository.create(dto);
 
     // La contraseña llega en texto plano y se almacena hasheada.
     user.passwordUserHash =
       await this.contrasenas.hashear(dto.passwordUserHash);
 
-    user.rol = await this.getRole(dto.idrol);
+    user.rol = await this.getRole(dto.idrol, manager);
 
-    return this.save(user);
+    return this.save(user, manager);
   }
 
   async updateUser(
     id: number,
     dto: UpdateUserDto,
+    manager?: EntityManager,
   ): Promise<User> {
-    const user = await this.findOneUser(id);
+    const repository = manager
+      ? manager.getRepository(User)
+      : this.userRepository;
+
+    const user = await this.findOneUser(id, manager);
 
     const { passwordUserHash, ...resto } = dto;
 
-    this.userRepository.merge(user, resto);
+    repository.merge(user, resto);
 
     if (
       passwordUserHash !== undefined &&
@@ -120,10 +138,10 @@ export class UserService {
     }
 
     if (dto.idrol !== undefined) {
-      user.rol = await this.getRole(dto.idrol);
+      user.rol = await this.getRole(dto.idrol, manager);
     }
 
-    return this.save(user);
+    return this.save(user, manager);
   }
 
   /**
@@ -221,16 +239,28 @@ export class UserService {
   async cambiarEstado(
     id: number,
     estado: EstadoUsuario,
+    manager?: EntityManager,
   ): Promise<User> {
-    const user = await this.findOneUser(id);
+    const user = await this.findOneUser(id, manager);
 
     user.estado = estado;
 
-    return this.userRepository.save(user);
+    const repository = manager
+      ? manager.getRepository(User)
+      : this.userRepository;
+
+    return repository.save(user);
   }
 
-  private async getRole(idrol: number): Promise<Role> {
-    const rol = await this.roleRepository.findOneBy({
+  private async getRole(
+    idrol: number,
+    manager?: EntityManager,
+  ): Promise<Role> {
+    const repository = manager
+      ? manager.getRepository(Role)
+      : this.roleRepository;
+
+    const rol = await repository.findOneBy({
       idrol,
     });
 
@@ -243,9 +273,16 @@ export class UserService {
     return rol;
   }
 
-  private async save(user: User): Promise<User> {
+  private async save(
+    user: User,
+    manager?: EntityManager,
+  ): Promise<User> {
     try {
-      return await this.userRepository.save(user);
+      const repository = manager
+        ? manager.getRepository(User)
+        : this.userRepository;
+
+      return await repository.save(user);
     } catch (error) {
       if (error instanceof QueryFailedError) {
         const code = (
