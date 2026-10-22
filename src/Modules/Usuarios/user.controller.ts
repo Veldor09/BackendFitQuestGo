@@ -12,6 +12,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+
 import {
   CambiarEstadoDto,
   CreateUserDto,
@@ -30,12 +33,17 @@ import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 
 import { RoleId } from './roles.enum';
+import { AuditoriaService } from '../Auditoria/auditoria.service';
 
 @Controller('usuarios')
 @UseGuards(GuardiaJwt, GuardiaRoles)
 export class UserController {
   constructor(
     private readonly userService: UserService,
+    private readonly auditoriaService: AuditoriaService,
+
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -146,21 +154,50 @@ export class UserController {
 
   /**
    * ADMINISTRACION
-   * Registra un nuevo usuario.
+   *
+   * Registra un nuevo usuario y su auditoria
+   * dentro de una unica transaccion.
+   *
+   * Si falla cualquiera de las operaciones,
+   * se revierten ambas.
    */
   @Post()
   @Roles(RoleId.Admin)
-  create(
+  async create(
     @Body() dto: CreateUserDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<User> {
-    return this.userService.createUser(dto);
+    return this.dataSource.transaction(async (manager) => {
+      const usuario = await this.userService.createUser(
+        dto,
+        manager,
+      );
+
+      await this.auditoriaService.registrar(
+        {
+          administradorId: actual.id,
+          accion: 'USUARIO_CREADO',
+          entidad: 'USUARIO',
+          entidadId: usuario.id,
+        },
+        manager,
+      );
+
+      return usuario;
+    });
   }
 
   /**
    * Actualiza la informacion de un usuario.
+   *
+   * Los administradores generan un registro
+   * de auditoria en la misma transaccion.
+   *
+   * Las actualizaciones de usuarios normales
+   * conservan su funcionamiento existente.
    */
   @Put(':id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
     @UsuarioActual() actual: UsuarioAutenticado,
@@ -173,13 +210,10 @@ export class UserController {
       );
     }
 
-    // Un usuario normal no puede cambiar su rol.
     if (!esAdmin && dto.idrol !== undefined) {
       delete dto.idrol;
     }
 
-    // Un administrador no puede quitarse
-    // a si mismo el rol de administrador.
     if (
       id === actual.id &&
       dto.idrol !== undefined &&
@@ -190,7 +224,29 @@ export class UserController {
       );
     }
 
-    return this.userService.updateUser(id, dto);
+    if (!esAdmin) {
+      return this.userService.updateUser(id, dto);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const usuario = await this.userService.updateUser(
+        id,
+        dto,
+        manager,
+      );
+
+      await this.auditoriaService.registrar(
+        {
+          administradorId: actual.id,
+          accion: 'USUARIO_ACTUALIZADO',
+          entidad: 'USUARIO',
+          entidadId: id,
+        },
+        manager,
+      );
+
+      return usuario;
+    });
   }
 
   /**
@@ -198,16 +254,17 @@ export class UserController {
    *
    * Activa o desactiva una cuenta
    * sin eliminar sus datos.
+   *
+   * El cambio de estado y la auditoria
+   * se ejecutan en una unica transaccion.
    */
   @Patch(':id/estado')
   @Roles(RoleId.Admin)
-  cambiarEstado(
+  async cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoDto,
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<User> {
-    // Un administrador no puede
-    // desactivar su propia cuenta.
     if (
       id === actual.id &&
       dto.estado === EstadoUsuario.Desactivado
@@ -217,9 +274,27 @@ export class UserController {
       );
     }
 
-    return this.userService.cambiarEstado(
-      id,
-      dto.estado,
-    );
+    return this.dataSource.transaction(async (manager) => {
+      const usuario = await this.userService.cambiarEstado(
+        id,
+        dto.estado,
+        manager,
+      );
+
+      await this.auditoriaService.registrar(
+        {
+          administradorId: actual.id,
+          accion: 'ESTADO_USUARIO_CAMBIADO',
+          entidad: 'USUARIO',
+          entidadId: id,
+          detalle: {
+            estado: dto.estado,
+          },
+        },
+        manager,
+      );
+
+      return usuario;
+    });
   }
 }

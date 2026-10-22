@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoleModule } from './roles.module';
 import { SeguridadModule } from '../Auth/seguridad.module';
 import { InsigniasModule } from '../Insignias/insignias.module';
+import { AuditoriaModule } from '../Auditoria/auditoria.module';
 
 import { Ruta } from '../Rutas/ruta.entity';
 import { RutaFavorita } from '../Rutas/ruta-favorita.entity';
@@ -32,6 +33,7 @@ import { UserService } from './user.service';
     RoleModule,
     SeguridadModule,
     InsigniasModule,
+    AuditoriaModule,
   ],
   controllers: [UserController],
   providers: [UserService],
