@@ -209,12 +209,12 @@ export class RutaService {
     // ADM-11: comprobar todas las actividades antes de guardar.
     await this.validarActividadesActivas(dto.actividades);
 
-    const visibilidad = dto.visibilidad || 'privada';
+    // Solo hay rutas privadas o publicas, y una publica sale de inmediato: no
+    // pasa por moderacion.
+    const visibilidad = dto.visibilidad === 'publica' ? 'publica' : 'privada';
 
     const estado =
-      visibilidad === 'publica' || visibilidad === 'publico'
-        ? EstadoRuta.Pendiente
-        : EstadoRuta.Privada;
+      visibilidad === 'publica' ? EstadoRuta.Publicada : EstadoRuta.Privada;
 
     const ruta = this.rutaRepository.create({
       ...dto,
@@ -227,12 +227,12 @@ export class RutaService {
 
     // Notificar al usuario sobre la creación de la ruta
     try {
-      if (estado === EstadoRuta.Pendiente) {
+      if (estado === EstadoRuta.Publicada) {
         await this.notificacionesService.crear({
           idUsuario: usuarioId,
           categoria: CategoriaNotificacion.Rutas,
-          titulo: 'Ruta enviada a revisión',
-          mensaje: `Tu ruta pública "${guardada.nombre}" fue enviada al equipo de moderación.`,
+          titulo: 'Ruta publicada',
+          mensaje: `Tu ruta pública "${guardada.nombre}" ya es visible para la comunidad.`,
           referenciaTipo: ReferenciaTipoNotificacion.Ruta,
           referenciaId: guardada.id,
         });
@@ -265,7 +265,11 @@ export class RutaService {
     return guardada;
   }
 
-  /** Envia una ruta privada a revision (RTE-07/MOD-01). Solo el dueno. */
+  /**
+   * Publica una ruta privada de inmediato (RTE-07). Solo el dueno. No hay
+   * cola de moderacion: la ruta queda visible para la comunidad al instante.
+   * El nombre se conserva por compatibilidad con `PATCH /rutas/:id/publicar`.
+   */
   async solicitarPublicacion(
     id: number,
     usuarioId: number,
@@ -277,12 +281,11 @@ export class RutaService {
     }
 
     if (ruta.estado !== EstadoRuta.Privada) {
-      throw new ForbiddenException(
-        'Solo una ruta privada puede enviarse a revision',
-      );
+      throw new ForbiddenException('Solo una ruta privada puede publicarse');
     }
 
-    ruta.estado = EstadoRuta.Pendiente;
+    ruta.estado = EstadoRuta.Publicada;
+    ruta.visibilidad = 'publica';
 
     const actualizada = await this.rutaRepository.save(ruta);
 
@@ -290,21 +293,39 @@ export class RutaService {
       await this.notificacionesService.crear({
         idUsuario: usuarioId,
         categoria: CategoriaNotificacion.Rutas,
-        titulo: 'Ruta enviada a revisión',
-        mensaje: `Tu solicitud para publicar "${ruta.nombre}" fue enviada al equipo de moderación.`,
+        titulo: 'Ruta publicada',
+        mensaje: `Tu ruta "${ruta.nombre}" ya es visible para la comunidad.`,
         referenciaTipo: ReferenciaTipoNotificacion.Ruta,
         referenciaId: ruta.id,
       });
     } catch (error) {
       this.logger.error(
-        `Error al notificar solicitud de publicación de ruta ${id}: ${error.message}`,
+        `Error al notificar publicación de ruta ${id}: ${error.message}`,
       );
     }
 
     return actualizada;
   }
 
-  /** Aprobar / rechazar (ADM-05): solo admin. */
+  /**
+   * Elimina una ruta: su dueno o un admin. Se van con ella sus recorridos y
+   * las veces que alguien la guardo como favorita (borrado en cascada).
+   */
+  async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
+    const ruta = await this.findOne(id);
+
+    if (ruta.creadoPor.id !== actual.id && !esAdmin(actual)) {
+      throw new ForbiddenException('Esta ruta no te pertenece');
+    }
+
+    await this.rutaRepository.remove(ruta);
+  }
+
+  /**
+   * Moderacion posterior (ADM-05): solo admin. Las rutas se publican solas, asi
+   * que el admin ya no las aprueba: solo puede retirarlas (Rechazada) o volver
+   * a ponerlas privadas.
+   */
   async cambiarEstado(
     id: number,
     estado: EstadoRuta,
@@ -316,6 +337,12 @@ export class RutaService {
 
     if (!ruta) {
       throw new NotFoundException(`Ruta ${id} no encontrada`);
+    }
+
+    if (estado === EstadoRuta.Publicada && ruta.estado !== EstadoRuta.Publicada) {
+      throw new BadRequestException(
+        'Las rutas se publican directamente: un admin no las aprueba',
+      );
     }
 
     const estadoAnterior = ruta.estado;

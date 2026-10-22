@@ -1,7 +1,10 @@
 ﻿import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -83,6 +86,7 @@ export class RutaController {
     return this.rutaService.create(dto, actual.id);
   }
 
+  /** Publica una ruta privada de inmediato (sin moderacion). */
   @Patch(':id/publicar')
   solicitarPublicacion(
     @Param('id', ParseIntPipe) id: number,
@@ -91,7 +95,17 @@ export class RutaController {
     return this.rutaService.solicitarPublicacion(id, actual.id);
   }
 
-  /** Aprobar / rechazar (ADM-05): solo admin. */
+  /** Eliminar una ruta: su dueno o un admin. */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  eliminar(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<void> {
+    return this.rutaService.eliminar(id, actual);
+  }
+
+  /** Retirar una ruta (ADM-05): solo admin. Ya no se aprueban: se publican solas. */
   @Patch(':id/estado')
   @UseGuards(GuardiaRoles)
   @Roles(RoleId.Admin)

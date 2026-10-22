@@ -5,6 +5,7 @@ import {
   ArrayUnique,
   IsArray,
   IsEnum,
+  IsIn,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -64,8 +65,11 @@ export class CrearRutaDto {
   @Type(() => PuntoRutaDto)
   puntos: PuntoRutaDto[];
 
+  /** Solo `privada` o `publica`: una ruta publica se publica de inmediato. */
   @IsOptional()
-  @IsString()
+  @IsIn(['privada', 'publica'], {
+    message: 'La visibilidad debe ser privada o publica',
+  })
   visibilidad?: string;
 }
 
