@@ -35,6 +35,54 @@ import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from './roles.enum';
 import { AuditoriaService } from '../Auditoria/auditoria.service';
 
+/**
+ * Campos permitidos en el historial de auditoría.
+ *
+ * No incluir contraseñas, tokens, hashes ni
+ * información sensible en esta lista.
+ */
+const CAMPOS_AUDITABLES = [
+  'nombreUser',
+  'emailUser',
+  'telefono',
+  'idrol',
+  'estado',
+] as const;
+
+type CampoAuditable =
+  (typeof CAMPOS_AUDITABLES)[number];
+
+type CambioAuditoria = {
+  anterior: unknown;
+  nuevo: unknown;
+};
+
+/**
+ * Construye un resumen de los campos modificados.
+ *
+ * Solo compara campos expresamente autorizados.
+ */
+function obtenerCambiosUsuario(
+  anterior: User,
+  nuevo: User,
+): Record<string, CambioAuditoria> {
+  const cambios: Record<string, CambioAuditoria> = {};
+
+  for (const campo of CAMPOS_AUDITABLES) {
+    const valorAnterior = anterior[campo];
+    const valorNuevo = nuevo[campo];
+
+    if (valorAnterior !== valorNuevo) {
+      cambios[campo] = {
+        anterior: valorAnterior ?? null,
+        nuevo: valorNuevo ?? null,
+      };
+    }
+  }
+
+  return cambios;
+}
+
 @Controller('usuarios')
 @UseGuards(GuardiaJwt, GuardiaRoles)
 export class UserController {
@@ -160,6 +208,9 @@ export class UserController {
    *
    * Si falla cualquiera de las operaciones,
    * se revierten ambas.
+   *
+   * Guarda únicamente los datos básicos
+   * permitidos en el historial.
    */
   @Post()
   @Roles(RoleId.Admin)
@@ -173,12 +224,22 @@ export class UserController {
         manager,
       );
 
+      const datosRegistrados: Record<string, unknown> = {};
+
+      for (const campo of CAMPOS_AUDITABLES) {
+        datosRegistrados[campo] =
+          usuario[campo] ?? null;
+      }
+
       await this.auditoriaService.registrar(
         {
           administradorId: actual.id,
           accion: 'USUARIO_CREADO',
           entidad: 'USUARIO',
           entidadId: usuario.id,
+          detalle: {
+            datosRegistrados,
+          },
         },
         manager,
       );
@@ -195,6 +256,9 @@ export class UserController {
    *
    * Las actualizaciones de usuarios normales
    * conservan su funcionamiento existente.
+   *
+   * El historial guarda únicamente los campos
+   * que cambiaron y sus valores anterior/nuevo.
    */
   @Put(':id')
   async update(
@@ -229,11 +293,60 @@ export class UserController {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const usuario = await this.userService.updateUser(
-        id,
-        dto,
-        manager,
+      /**
+       * Consultamos el estado original dentro
+       * de la misma transacción.
+       */
+      const usuarioAnterior =
+        await this.userService.findOneUser(
+          id,
+          manager,
+        );
+
+      /**
+       * Guardamos una copia independiente
+       * de los valores auditables antes
+       * de actualizar la entidad.
+       */
+      const valoresAnteriores = {
+        ...usuarioAnterior,
+      } as User;
+
+      /**
+       * Actualizamos el usuario utilizando
+       * el servicio existente.
+       */
+      const usuarioActualizado =
+        await this.userService.updateUser(
+          id,
+          dto,
+          manager,
+        );
+
+      /**
+       * Comparamos los valores originales
+       * con los valores finalmente guardados.
+       */
+      const cambios = obtenerCambiosUsuario(
+        valoresAnteriores,
+        usuarioActualizado,
       );
+
+      /**
+       * Nunca guardamos la contraseña ni
+       * su hash. Solo indicamos que cambió.
+       */
+      const contrasenaModificada =
+        dto.passwordUserHash !== undefined &&
+        dto.passwordUserHash !== '';
+
+      const detalle: Record<string, unknown> = {
+        cambios,
+      };
+
+      if (contrasenaModificada) {
+        detalle.contrasenaModificada = true;
+      }
 
       await this.auditoriaService.registrar(
         {
@@ -241,11 +354,12 @@ export class UserController {
           accion: 'USUARIO_ACTUALIZADO',
           entidad: 'USUARIO',
           entidadId: id,
+          detalle,
         },
         manager,
       );
 
-      return usuario;
+      return usuarioActualizado;
     });
   }
 
@@ -257,6 +371,8 @@ export class UserController {
    *
    * El cambio de estado y la auditoria
    * se ejecutan en una unica transaccion.
+   *
+   * Registra el estado anterior y nuevo.
    */
   @Patch(':id/estado')
   @Roles(RoleId.Admin)
@@ -275,11 +391,38 @@ export class UserController {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const usuario = await this.userService.cambiarEstado(
-        id,
-        dto.estado,
-        manager,
-      );
+      /**
+       * Consultar el estado anterior.
+       */
+      const usuarioAnterior =
+        await this.userService.findOneUser(
+          id,
+          manager,
+        );
+
+      const estadoAnterior = usuarioAnterior.estado;
+
+      /**
+       * Aplicar el cambio de estado.
+       */
+      const usuario =
+        await this.userService.cambiarEstado(
+          id,
+          dto.estado,
+          manager,
+        );
+
+      /**
+       * Registrar la diferencia.
+       */
+      const cambios: Record<string, CambioAuditoria> = {};
+
+      if (estadoAnterior !== usuario.estado) {
+        cambios.estado = {
+          anterior: estadoAnterior ?? null,
+          nuevo: usuario.estado ?? null,
+        };
+      }
 
       await this.auditoriaService.registrar(
         {
@@ -288,7 +431,7 @@ export class UserController {
           entidad: 'USUARIO',
           entidadId: id,
           detalle: {
-            estado: dto.estado,
+            cambios,
           },
         },
         manager,
