@@ -66,4 +66,35 @@ export class RegistroAuditoria {
     default: () => 'now()',
   })
   creadoEn: Date;
+
+  /**
+   * Archivado lógico.
+   * El registro permanece en PostgreSQL.
+   */
+  @Column({
+    name: 'archivado',
+    type: 'boolean',
+    default: false,
+  })
+  archivado: boolean;
+
+  /**
+   * Administrador que archivó el registro.
+   */
+  @Column({
+    name: 'archivado_por',
+    type: 'integer',
+    nullable: true,
+  })
+  archivadoPor: number | null;
+
+  /**
+   * Fecha del archivado.
+   */
+  @Column({
+    name: 'archivado_en',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  archivadoEn: Date | null;
 }
