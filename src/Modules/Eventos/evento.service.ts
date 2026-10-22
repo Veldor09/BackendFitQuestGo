@@ -4,12 +4,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { esAdmin } from '../Auth/es-admin';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
+import {
+  detectarTipoImagen,
+  MAX_FOTO_BYTES,
+} from '../Nodos/imagen.util';
 import { ActualizarEventoDto, CrearEventoDto } from './dto/EventoDTO';
+import { EventoFoto } from './evento-foto.entity';
 import { Evento, ZonaEvento } from './evento.entity';
 
 /** Deja de cada trazo solo lo que se guarda (sin propiedades de mas). */
@@ -26,6 +33,9 @@ export class EventoService {
   constructor(
     @InjectRepository(Evento)
     private readonly eventoRepository: Repository<Evento>,
+    @Optional()
+    @InjectRepository(EventoFoto)
+    private readonly fotoRepository?: Repository<EventoFoto>,
   ) {}
 
   /** Lo que ve el deportista: eventos que no han terminado, el mas proximo primero. */
@@ -122,6 +132,52 @@ export class EventoService {
       throw new ForbiddenException('Este evento no te pertenece');
     }
     await this.eventoRepository.remove(evento);
+  }
+
+
+  /**
+   * Adjunta (o reemplaza) la foto. Solo su dueno. Se confia en los bytes, no en
+   * lo que declare el archivo: solo JPEG, PNG o WebP de hasta 3 MB.
+   */
+  async guardarFoto(
+    id: number,
+    datos: Buffer,
+    actual: UsuarioAutenticado,
+  ): Promise<Evento> {
+    const objeto = await this.findOne(id);
+
+    if (objeto.creadoPor.id !== actual.id) {
+      throw new ForbiddenException('Este evento no te pertenece');
+    }
+
+    if (datos.length > MAX_FOTO_BYTES) {
+      throw new PayloadTooLargeException(
+        `La foto pesa mas de ${MAX_FOTO_BYTES / (1024 * 1024)} MB`,
+      );
+    }
+
+    const tipoMime = detectarTipoImagen(datos);
+    if (!tipoMime) {
+      throw new BadRequestException('La foto debe ser JPEG, PNG o WebP');
+    }
+
+    const repo = this.fotoRepository;
+    if (!repo) throw new Error('fotoRepository no disponible');
+    await repo.save({ eventoId: id, contenido: datos, tipoMime });
+    objeto.conFoto = true;
+    return this.eventoRepository.save(objeto);
+  }
+
+  /** Foto de un evento: la ve cualquier usuario autenticado. Sin foto: 404. */
+  async obtenerFoto(
+    id: number,
+  ): Promise<{ contenido: Buffer; tipoMime: string }> {
+    await this.findOne(id);
+    const foto = await this.fotoRepository?.findOne({ where: { eventoId: id } });
+    if (!foto) {
+      throw new NotFoundException(`El evento ${id} no tiene foto`);
+    }
+    return { contenido: foto.contenido, tipoMime: foto.tipoMime };
   }
 
   private validarFechas(inicio: Date, fin: Date): void {

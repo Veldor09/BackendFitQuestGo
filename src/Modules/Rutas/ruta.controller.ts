@@ -1,5 +1,6 @@
 ﻿import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -9,9 +10,16 @@
   ParseIntPipe,
   Patch,
   Post,
+  Res,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { GuardiaJwt } from '../Auth/guards/jwt.guard';
+import { MAX_FOTO_BYTES } from '../Nodos/imagen.util';
 import { GuardiaRoles } from '../Auth/guards/roles.guard';
 import { Roles } from '../Auth/decorators/roles.decorator';
 import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
@@ -93,6 +101,42 @@ export class RutaController {
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<Ruta> {
     return this.rutaService.solicitarPublicacion(id, actual.id);
+  }
+
+
+  /**
+   * Foto de la ruta (una, opcional). Va aparte de `POST /rutas` para no mezclar el
+   * JSON validado con un archivo. Campo multipart `foto`; solo JPEG, PNG o
+   * WebP de hasta 3 MB.
+   */
+  @Post(':id/foto')
+  @UseInterceptors(
+    FileInterceptor('foto', { limits: { fileSize: MAX_FOTO_BYTES } }),
+  )
+  subirFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() foto: Express.Multer.File | undefined,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
+    if (!foto) {
+      throw new BadRequestException('Falta el archivo en el campo "foto"');
+    }
+    return this.rutaService.guardarFoto(id, foto.buffer, actual);
+  }
+
+  /** Bytes de la foto. */
+  @Get(':id/foto')
+  async verFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { contenido, tipoMime } = await this.rutaService.obtenerFoto(id, actual);
+    res.set({
+      'Content-Type': tipoMime,
+      'Cache-Control': 'private, max-age=3600',
+    });
+    return new StreamableFile(contenido);
   }
 
   /** Eliminar una ruta: su dueno o un admin. */

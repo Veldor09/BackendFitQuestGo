@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
   Optional,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -20,9 +21,14 @@ import {
   ReferenciaTipoNotificacion,
 } from '../Notificaciones/notificacion.enum';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
+import {
+  detectarTipoImagen,
+  MAX_FOTO_BYTES,
+} from '../Nodos/imagen.util';
 import { CrearRutaDto } from './dto/RutaDTO';
 import { EstadoRuta } from './estado-ruta.enum';
 import { RutaFavorita } from './ruta-favorita.entity';
+import { RutaFoto } from './ruta-foto.entity';
 import { Ruta } from './ruta.entity';
 import { RecorridoRuta } from './recorrido-ruta.entity';
 import { CrearRecorridoDto } from './dto/CrearRecorridoDTO';
@@ -42,6 +48,9 @@ export class RutaService {
     @Optional()
     @InjectRepository(RecorridoRuta)
     private readonly recorridoRepository?: Repository<RecorridoRuta>,
+    @Optional()
+    @InjectRepository(RutaFoto)
+    private readonly fotoRepository?: Repository<RutaFoto>,
   ) {}
 
   /**
@@ -385,6 +394,56 @@ export class RutaService {
     return actualizada;
   }
 
+
+
+  /**
+   * Adjunta (o reemplaza) la foto. Solo su dueno. Se confia en los bytes, no en
+   * lo que declare el archivo: solo JPEG, PNG o WebP de hasta 3 MB.
+   */
+  async guardarFoto(
+    id: number,
+    datos: Buffer,
+    actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
+    const objeto = await this.findOne(id);
+
+    if (objeto.creadoPor.id !== actual.id) {
+      throw new ForbiddenException('Esto no te pertenece');
+    }
+
+    if (datos.length > MAX_FOTO_BYTES) {
+      throw new PayloadTooLargeException(
+        `La foto pesa mas de ${MAX_FOTO_BYTES / (1024 * 1024)} MB`,
+      );
+    }
+
+    const tipoMime = detectarTipoImagen(datos);
+    if (!tipoMime) {
+      throw new BadRequestException('La foto debe ser JPEG, PNG o WebP');
+    }
+
+    const repo = this.fotoRepository;
+    if (!repo) throw new Error('fotoRepository no disponible');
+    await repo.save({ rutaId: id, contenido: datos, tipoMime });
+    objeto.conFoto = true;
+    return this.rutaRepository.save(objeto);
+  }
+
+  /**
+   * Foto de una ruta. La ve quien puede ver la ruta (`verRuta`): una publicada,
+   * cualquiera; una privada, solo su dueno. Sin foto o sin permiso: 404.
+   */
+  async obtenerFoto(
+    id: number,
+    actual: UsuarioAutenticado,
+  ): Promise<{ contenido: Buffer; tipoMime: string }> {
+    await this.verRuta(id, actual);
+    const foto = await this.fotoRepository?.findOne({ where: { rutaId: id } });
+    if (!foto) {
+      throw new NotFoundException(`La ruta ${id} no tiene foto`);
+    }
+    return { contenido: foto.contenido, tipoMime: foto.tipoMime };
+  }
 
   /** Registrar recorrido de una ruta completada por un usuario (RTE-08). */
   async registrarRecorrido(

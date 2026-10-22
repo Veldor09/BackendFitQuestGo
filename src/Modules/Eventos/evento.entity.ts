@@ -51,6 +51,10 @@ export class Evento {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   recorridos: ZonaEvento[];
 
+  // Hay una foto en `evento_fotos` (los bytes no viajan al listar eventos).
+  @Column({ name: 'con_foto', type: 'boolean', default: false })
+  conFoto: boolean;
+
   // Interruptor de la empresa para destacar este evento (ver `Nodo.destacarActivado`).
   @Column({ name: 'destacar_activado', type: 'boolean', default: false })
   destacarActivado?: boolean;

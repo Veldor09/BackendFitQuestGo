@@ -1,5 +1,6 @@
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,9 +11,16 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Res,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { Roles } from '../Auth/decorators/roles.decorator';
+import { MAX_FOTO_BYTES } from '../Nodos/imagen.util';
 import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import { GuardiaJwt } from '../Auth/guards/jwt.guard';
 import { GuardiaRoles } from '../Auth/guards/roles.guard';
@@ -108,6 +116,44 @@ export class EventoController {
     @UsuarioActual() actual: UsuarioAutenticado,
   ): Promise<Evento> {
     return this.eventoService.actualizar(id, dto, actual);
+  }
+
+
+  /**
+   * Foto del evento (una, opcional). Va aparte de `POST /eventos` para no mezclar el
+   * JSON validado con un archivo. Campo multipart `foto`; solo JPEG, PNG o
+   * WebP de hasta 3 MB.
+   */
+  @Post(':id/foto')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Empresa)
+  @UseInterceptors(
+    FileInterceptor('foto', { limits: { fileSize: MAX_FOTO_BYTES } }),
+  )
+  subirFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() foto: Express.Multer.File | undefined,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Evento> {
+    if (!foto) {
+      throw new BadRequestException('Falta el archivo en el campo "foto"');
+    }
+    return this.eventoService.guardarFoto(id, foto.buffer, actual);
+  }
+
+  /** Bytes de la foto. */
+  @Get(':id/foto')
+  async verFoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() actual: UsuarioAutenticado,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { contenido, tipoMime } = await this.eventoService.obtenerFoto(id);
+    res.set({
+      'Content-Type': tipoMime,
+      'Cache-Control': 'private, max-age=3600',
+    });
+    return new StreamableFile(contenido);
   }
 
   /** La empresa dueña o un admin. */
