@@ -1,9 +1,7 @@
 
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -48,6 +46,11 @@ export class AuditoriaService {
     return repositorio.save(registro);
   }
 
+  /**
+   * Consulta todos los registros de auditoría.
+   * Incluye los registros archivados anteriormente.
+   * Mantiene los filtros y la paginación.
+   */
   async consultar(filtros: ConsultarAuditoriaDto) {
     const {
       administradorId,
@@ -70,10 +73,7 @@ export class AuditoriaService {
     }
 
     const consulta = this.auditoriaRepository
-      .createQueryBuilder('auditoria')
-      .where('auditoria.archivado = :archivado', {
-        archivado: false,
-      });
+      .createQueryBuilder('auditoria');
 
     if (administradorId !== undefined) {
       consulta.andWhere(
@@ -121,51 +121,6 @@ export class AuditoriaService {
       pagina,
       limite,
       totalPaginas: Math.ceil(total / limite),
-    };
-  }
-
-  /**
-   * Archiva un registro sin eliminarlo de PostgreSQL.
-   * Guarda el administrador responsable y la fecha.
-   */
-  async archivar(
-    id: number,
-    administradorId: number,
-  ) {
-    const resultado = await this.auditoriaRepository
-      .createQueryBuilder()
-      .update(RegistroAuditoria)
-      .set({
-        archivado: true,
-        archivadoPor: administradorId,
-        archivadoEn: new Date(),
-      })
-      .where('id = :id', { id })
-      .andWhere('archivado = :archivado', {
-        archivado: false,
-      })
-      .execute();
-
-    if (resultado.affected === 0) {
-      const registro = await this.auditoriaRepository.findOne({
-        where: { id },
-      });
-
-      if (!registro) {
-        throw new NotFoundException(
-          'El registro de auditoría no existe',
-        );
-      }
-
-      throw new ConflictException(
-        'Este registro de auditoría ya fue archivado',
-      );
-    }
-
-    return {
-      mensaje: 'Registro de auditoría archivado correctamente',
-      id,
-      archivado: true,
     };
   }
 }

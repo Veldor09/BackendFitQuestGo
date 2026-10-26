@@ -1,4 +1,5 @@
-﻿import { BadRequestException } from '@nestjs/common';
+﻿
+import { BadRequestException } from '@nestjs/common';
 import { AuditoriaService } from './auditoria.service';
 import { RegistroAuditoria } from './registro-auditoria.entity';
 
@@ -78,6 +79,8 @@ describe('AuditoriaService', () => {
       service.consultar({
         fechaDesde: '2026-10-22',
         fechaHasta: '2026-10-20',
+        pagina: 1,
+        limite: 10,
       }),
     ).rejects.toThrow(BadRequestException);
   });
