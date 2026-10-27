@@ -4,6 +4,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -14,6 +15,7 @@ import {
 
 import { AuditoriaService } from '../Auditoria/auditoria.service';
 import { monedaParaPais } from './monedas';
+import { PatrocinioAvisosService } from './patrocinio-avisos.service';
 import { PlanPatrocinio } from './plan-patrocinio.entity';
 import { PrecioPatrocinio } from './precio-patrocinio.entity';
 import {
@@ -44,6 +46,11 @@ export class SuscripcionesService {
     private readonly auditoriaService: AuditoriaService,
 
     private readonly dataSource: DataSource,
+
+    // Avisa al dueno del plan (campana + aviso del telefono) cuando el admin
+    // aprueba o rechaza. Opcional: sin el, aprobar y rechazar funcionan igual.
+    @Optional()
+    private readonly avisos?: PatrocinioAvisosService,
   ) {}
 
   async consultarPlanes(pais?: string) {
@@ -83,6 +90,40 @@ export class SuscripcionesService {
       pais: pais?.trim().toUpperCase() || null,
       moneda,
       planes: planesDisponibles,
+    };
+  }
+
+  /**
+   * La suscripcion mas reciente de la persona (o `null` si nunca pidio una):
+   * es lo que la app muestra en "Plan de patrocinio". `vigente` es lo que
+   * manda para destacar: activa Y sin vencer (el estado solo cambia cuando
+   * alguien lo actualiza, la fecha no miente).
+   */
+  async miSuscripcion(usuarioId: number) {
+    const suscripcion = await this.suscripcionesRepository.findOne({
+      where: { usuarioId },
+      order: { creadoEn: 'DESC', id: 'DESC' },
+    });
+    if (!suscripcion) return null;
+
+    const plan = await this.planesRepository.findOne({
+      where: { id: suscripcion.planId },
+    });
+
+    return {
+      id: suscripcion.id,
+      estado: suscripcion.estado,
+      vigente:
+        suscripcion.estado === EstadoSuscripcion.Activa &&
+        suscripcion.venceEn != null &&
+        suscripcion.venceEn.getTime() > Date.now(),
+      planId: suscripcion.planId,
+      planNombre: plan?.nombre ?? null,
+      moneda: suscripcion.moneda,
+      precioAplicado: suscripcion.precioAplicado,
+      iniciaEn: suscripcion.iniciaEn,
+      venceEn: suscripcion.venceEn,
+      creadoEn: suscripcion.creadoEn,
     };
   }
 
@@ -191,7 +232,7 @@ export class SuscripcionesService {
     suscripcionId: number,
     administradorId: number,
   ) {
-    return this.dataSource.transaction(async (manager) => {
+    const aprobada = await this.dataSource.transaction(async (manager) => {
       const suscripcionesRepository =
         manager.getRepository(Suscripcion);
 
@@ -290,6 +331,17 @@ export class SuscripcionesService {
         mensaje: 'Suscripcion aprobada correctamente',
       };
     });
+
+    // Ya confirmada la aprobacion: el aviso no puede deshacerla ni hacerla fallar.
+    await this.avisos?.planAprobado(
+      aprobada.usuarioId,
+      aprobada.id,
+      Math.round(
+        (aprobada.venceEn.getTime() - aprobada.iniciaEn.getTime()) /
+          (24 * 60 * 60 * 1000),
+      ),
+    );
+    return aprobada;
   }
 
   async rechazarSuscripcion(
@@ -305,7 +357,7 @@ export class SuscripcionesService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const rechazada = await this.dataSource.transaction(async (manager) => {
       const suscripcionesRepository =
         manager.getRepository(Suscripcion);
 
@@ -359,5 +411,12 @@ export class SuscripcionesService {
         mensaje: 'Suscripcion rechazada correctamente',
       };
     });
+
+    await this.avisos?.planRechazado(
+      rechazada.usuarioId,
+      rechazada.id,
+      motivo,
+    );
+    return rechazada;
   }
 }
