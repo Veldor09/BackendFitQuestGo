@@ -22,6 +22,7 @@ import {
   CategoriaNotificacion,
   ReferenciaTipoNotificacion,
 } from '../Notificaciones/notificacion.enum';
+import { TipoPush } from '../Notificaciones/push/push-plantillas';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { RoleId } from '../Usuarios/roles.enum';
 import type { User } from '../Usuarios/user.entity';
@@ -322,6 +323,7 @@ export class NodoService {
               'La moderación validó tu propuesta. El punto de interés ya es visible en el mapa.',
             referenciaTipo: ReferenciaTipoNotificacion.Nodo,
             referenciaId: nodo.id,
+            push: { tipo: TipoPush.NodoAprobado, params: { nombre: nodo.nombre } },
           });
         } else if (estado === EstadoNodo.Rechazado) {
           await this.notificacionesService.crear({
@@ -332,6 +334,7 @@ export class NodoService {
               'La propuesta no cumple con los criterios de moderación comunitarios.',
             referenciaTipo: ReferenciaTipoNotificacion.Nodo,
             referenciaId: nodo.id,
+            push: { tipo: TipoPush.NodoRechazado, params: { nombre: nodo.nombre } },
           });
         }
       } catch (error) {

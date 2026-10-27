@@ -4,6 +4,10 @@ import {
   ReferenciaTipoNotificacion,
 } from '../Notificaciones/notificacion.enum';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
+import {
+  type SolicitudPush,
+  TipoPush,
+} from '../Notificaciones/push/push-plantillas';
 
 const TITULO_VENCIDO = 'Tu plan de patrocinio venció';
 const TITULO_POR_VENCER = 'Tu plan de patrocinio vence pronto';
@@ -17,21 +21,35 @@ const TITULO_POR_VENCER = 'Tu plan de patrocinio vence pronto';
 export class PatrocinioAvisosService {
   constructor(private readonly notificaciones: NotificacionesService) {}
 
-  async planAprobado(usuarioId: number, suscripcionId: number): Promise<void> {
+  /** [dias] es lo que dura el plan aprobado (por defecto 30). */
+  async planAprobado(
+    usuarioId: number,
+    suscripcionId: number,
+    dias = 30,
+  ): Promise<void> {
     await this.avisar(
       usuarioId,
       suscripcionId,
       'Tu plan de patrocinio fue aprobado',
-      'Ya puedes destacar tus comercios y eventos durante 30 días.',
+      `Ya puedes destacar tus comercios y eventos durante ${dias} días.`,
+      { tipo: TipoPush.PlanAprobado },
     );
   }
 
-  async planRechazado(usuarioId: number, suscripcionId: number): Promise<void> {
+  /** [motivo] es lo que escribio el admin al rechazar: la persona merece saberlo. */
+  async planRechazado(
+    usuarioId: number,
+    suscripcionId: number,
+    motivo?: string,
+  ): Promise<void> {
     await this.avisar(
       usuarioId,
       suscripcionId,
       'Tu solicitud de plan fue rechazada',
-      'Puedes enviar una nueva solicitud cuando quieras.',
+      motivo
+        ? `Motivo: ${/[.!?]$/.test(motivo.trim()) ? motivo.trim() : `${motivo.trim()}.`} Puedes enviar una nueva solicitud cuando quieras.`
+        : 'Puedes enviar una nueva solicitud cuando quieras.',
+      { tipo: TipoPush.PlanRechazado },
     );
   }
 
@@ -44,6 +62,7 @@ export class PatrocinioAvisosService {
       suscripcionId,
       'Tu plan de patrocinio fue suspendido',
       'Tus publicaciones dejaron de verse como destacadas. Si crees que es un error, escribe al equipo de FitQuest Go.',
+      { tipo: TipoPush.PlanSuspendido },
     );
   }
 
@@ -54,6 +73,7 @@ export class PatrocinioAvisosService {
       suscripcionId,
       TITULO_VENCIDO,
       'Tus publicaciones siguen visibles, pero ya no aparecen como destacadas. Renueva tu plan para volver a destacarlas.',
+      { tipo: TipoPush.PlanVencido },
     );
   }
 
@@ -73,6 +93,10 @@ export class PatrocinioAvisosService {
       suscripcionId,
       TITULO_POR_VENCER,
       `Vence el ${fecha}. Renuévalo para que tus publicaciones sigan destacadas.`,
+      {
+        tipo: TipoPush.PlanPorVencer,
+        params: { venceEn: venceEn.toISOString() },
+      },
     );
   }
 
@@ -81,6 +105,7 @@ export class PatrocinioAvisosService {
     suscripcionId: number,
     titulo: string,
     mensaje: string,
+    push: SolicitudPush,
   ): Promise<boolean> {
     const yaEstaba = await this.notificaciones.yaAvisada(
       usuarioId,
@@ -89,7 +114,7 @@ export class PatrocinioAvisosService {
       titulo,
     );
     if (yaEstaba) return false;
-    return this.avisar(usuarioId, suscripcionId, titulo, mensaje);
+    return this.avisar(usuarioId, suscripcionId, titulo, mensaje, push);
   }
 
   private async avisar(
@@ -97,6 +122,7 @@ export class PatrocinioAvisosService {
     suscripcionId: number,
     titulo: string,
     mensaje: string,
+    push: SolicitudPush,
   ): Promise<boolean> {
     const creada = await this.notificaciones.crear({
       idUsuario: usuarioId,
@@ -105,6 +131,7 @@ export class PatrocinioAvisosService {
       mensaje,
       referenciaTipo: ReferenciaTipoNotificacion.Suscripcion,
       referenciaId: suscripcionId,
+      push,
     });
     return creada !== null;
   }

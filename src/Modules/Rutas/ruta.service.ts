@@ -20,6 +20,7 @@ import {
   CategoriaNotificacion,
   ReferenciaTipoNotificacion,
 } from '../Notificaciones/notificacion.enum';
+import { TipoPush } from '../Notificaciones/push/push-plantillas';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import {
   detectarTipoImagen,
@@ -372,6 +373,7 @@ export class RutaService {
               'La moderación verificó el trazado. Tu ruta ya es pública y visible para la comunidad.',
             referenciaTipo: ReferenciaTipoNotificacion.Ruta,
             referenciaId: ruta.id,
+            push: { tipo: TipoPush.RutaAprobada, params: { nombre: ruta.nombre } },
           });
         } else if (estado === EstadoRuta.Rechazada) {
           await this.notificacionesService.crear({
@@ -382,6 +384,7 @@ export class RutaService {
               'La ruta no cumple con los criterios de publicación comunitarios.',
             referenciaTipo: ReferenciaTipoNotificacion.Ruta,
             referenciaId: ruta.id,
+            push: { tipo: TipoPush.RutaRechazada, params: { nombre: ruta.nombre } },
           });
         }
       } catch (error) {

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -7,6 +12,7 @@ import {
 } from './dto/notificacion.dto';
 import { Notificacion } from './notificacion.entity';
 import { ReferenciaTipoNotificacion } from './notificacion.enum';
+import { PushService } from './push/push.service';
 
 @Injectable()
 export class NotificacionesService {
@@ -15,6 +21,8 @@ export class NotificacionesService {
   constructor(
     @InjectRepository(Notificacion)
     private readonly notificacionRepo: Repository<Notificacion>,
+    // Opcional: sin el, las notificaciones solo viven en la campana de la app.
+    @Optional() private readonly pushService?: PushService,
   ) {}
 
   async crear(
@@ -30,7 +38,16 @@ export class NotificacionesService {
         referenciaId: params.referenciaId ?? null,
         leida: false,
       });
-      return await this.notificacionRepo.save(notificacion);
+      const guardada = await this.notificacionRepo.save(notificacion);
+      if (params.push && this.pushService) {
+        // Sin esperar: el aviso fuera de la app no demora ni puede romper la accion.
+        this.pushService.notificar(guardada, params.push).catch((error) => {
+          this.logger.warn(
+            `Aviso fuera de la app de la notificacion ${guardada.id}: ${error?.message ?? error}`,
+          );
+        });
+      }
+      return guardada;
     } catch (error) {
       this.logger.error(
         `Error al crear notificacion para usuario ${params.idUsuario}: ${error.message}`,

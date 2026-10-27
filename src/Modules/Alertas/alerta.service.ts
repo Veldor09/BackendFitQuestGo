@@ -17,6 +17,7 @@ import {
   CategoriaNotificacion,
   ReferenciaTipoNotificacion,
 } from '../Notificaciones/notificacion.enum';
+import { TipoPush } from '../Notificaciones/push/push-plantillas';
 import { NotificacionesService } from '../Notificaciones/notificaciones.service';
 import { CrearAlertaDto, VotarAlertaDto } from './dto/AlertaDTO';
 import { AlertaVoto } from './alerta-voto.entity';
@@ -206,6 +207,7 @@ export class AlertaService {
           mensaje: 'Un administrador ha verificado y marcado tu reporte como resuelto.',
           referenciaTipo: ReferenciaTipoNotificacion.Alerta,
           referenciaId: alerta.id,
+          push: { tipo: TipoPush.AlertaResuelta },
         });
       } catch (error) {
         this.logger.error(

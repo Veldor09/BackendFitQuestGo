@@ -26,6 +26,12 @@ export class SuscripcionesController {
     return this.suscripcionesService.consultarPlanes(pais);
   }
 
+  /** Mi suscripcion mas reciente, o `null` si nunca pedi una. */
+  @Get('suscripciones/mia')
+  miSuscripcion(@Req() request: RequestAutenticado) {
+    return this.suscripcionesService.miSuscripcion(request.usuario.id);
+  }
+
   @Post('suscripciones')
   solicitarSuscripcion(
     @Req() request: RequestAutenticado,
