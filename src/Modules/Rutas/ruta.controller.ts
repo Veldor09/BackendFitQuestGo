@@ -94,7 +94,6 @@ export class RutaController {
     return this.rutaService.create(dto, actual.id);
   }
 
-  /** Publica una ruta privada de inmediato (sin moderacion). */
   @Patch(':id/publicar')
   solicitarPublicacion(
     @Param('id', ParseIntPipe) id: number,
@@ -103,12 +102,6 @@ export class RutaController {
     return this.rutaService.solicitarPublicacion(id, actual.id);
   }
 
-
-  /**
-   * Foto de la ruta (una, opcional). Va aparte de `POST /rutas` para no mezclar el
-   * JSON validado con un archivo. Campo multipart `foto`; solo JPEG, PNG o
-   * WebP de hasta 3 MB.
-   */
   @Post(':id/foto')
   @UseInterceptors(
     FileInterceptor('foto', { limits: { fileSize: MAX_FOTO_BYTES } }),
@@ -124,7 +117,6 @@ export class RutaController {
     return this.rutaService.guardarFoto(id, foto.buffer, actual);
   }
 
-  /** Bytes de la foto. */
   @Get(':id/foto')
   async verFoto(
     @Param('id', ParseIntPipe) id: number,
@@ -139,7 +131,6 @@ export class RutaController {
     return new StreamableFile(contenido);
   }
 
-  /** Eliminar una ruta: su dueno o un admin. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   eliminar(
@@ -149,7 +140,6 @@ export class RutaController {
     return this.rutaService.eliminar(id, actual);
   }
 
-  /** Retirar una ruta (ADM-05): solo admin. Ya no se aprueban: se publican solas. */
   @Patch(':id/estado')
   @UseGuards(GuardiaRoles)
   @Roles(RoleId.Admin)

@@ -6,9 +6,10 @@ import { AuthConfig } from '../auth.config';
 export class MailService {
   constructor(private readonly config: AuthConfig) {}
 
-  async enviarCodigoRecuperacion(
+  async enviar(
     destinatario: string,
-    codigo: string,
+    asunto: string,
+    texto: string,
   ): Promise<void> {
     const usuario = this.config.gmailUser;
     const clave = this.config.gmailAppPassword;
@@ -26,10 +27,20 @@ export class MailService {
     await transporte.sendMail({
       from: `"FitQuest Go" <${usuario}>`,
       to: destinatario,
-      subject: 'Codigo para restablecer tu contrasena',
-      text:
-        `Tu codigo para restablecer la contrasena de FitQuest Go es: ${codigo}\n\n` +
-        'Vence en 15 minutos. Si no pediste este codigo, ignora este correo.',
+      subject: asunto,
+      text: texto,
     });
+  }
+
+  async enviarCodigoRecuperacion(
+    destinatario: string,
+    codigo: string,
+  ): Promise<void> {
+    await this.enviar(
+      destinatario,
+      'Codigo para restablecer tu contrasena',
+      `Tu codigo para restablecer la contrasena de FitQuest Go es: ${codigo}\n\n` +
+        'Vence en 15 minutos. Si no pediste este codigo, ignora este correo.',
+    );
   }
 }

@@ -51,7 +51,9 @@ export class Evento {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   recorridos: ZonaEvento[];
 
-  // Hay una foto en `evento_fotos` (los bytes no viajan al listar eventos).
+  @Column({ type: 'boolean', default: false })
+  desactivado: boolean;
+
   @Column({ name: 'con_foto', type: 'boolean', default: false })
   conFoto: boolean;
 

@@ -17,5 +17,6 @@ import { MailService } from './services/mail.service';
   ],
   controllers: [AuthController],
   providers: [AuthService, TokensServicio, MailService],
+  exports: [MailService],
 })
 export class AuthModule {}

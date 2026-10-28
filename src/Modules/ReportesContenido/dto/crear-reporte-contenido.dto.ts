@@ -1,13 +1,14 @@
-﻿import {
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
   IsEnum,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { MotivoReporte } from '../motivo-reporte.enum';
 import { TipoContenidoReportado } from '../tipo-contenido-reportado.enum';
 
 export class CrearReporteContenidoDto {
@@ -19,13 +20,15 @@ export class CrearReporteContenidoDto {
   @Min(1)
   contenidoId: number;
 
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  motivo: string;
+  @IsEnum(MotivoReporte, { message: 'El motivo no es valido' })
+  motivo: MotivoReporte;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
   descripcion?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  esFoto?: boolean;
 }

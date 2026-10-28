@@ -379,7 +379,7 @@ describe('NodoService', () => {
 
     it('404 si el nodo no tiene foto', async () => {
       nodos.findOne.mockResolvedValue(
-        nodo({ estado: EstadoNodo.Aprobado }),
+        nodo({ estado: EstadoNodo.Aprobado, conFoto: true }),
       );
       fotos.findOne.mockResolvedValue(null);
 
@@ -390,7 +390,7 @@ describe('NodoService', () => {
 
     it('un nodo aprobado lo ve cualquier usuario', async () => {
       nodos.findOne.mockResolvedValue(
-        nodo({ estado: EstadoNodo.Aprobado }),
+        nodo({ estado: EstadoNodo.Aprobado, conFoto: true }),
       );
       fotos.findOne.mockResolvedValue(foto());
 
@@ -401,9 +401,24 @@ describe('NodoService', () => {
       });
     });
 
+    it('una foto desactivada por un reporte no se sirve, salvo al admin que la revisa', async () => {
+      nodos.findOne.mockResolvedValue(
+        nodo({ estado: EstadoNodo.Aprobado, conFoto: false }),
+      );
+      fotos.findOne.mockResolvedValue(foto());
+
+      await expect(service.obtenerFoto(5, otro)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.obtenerFoto(5, dueno)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.obtenerFoto(5, admin)).resolves.toBeDefined();
+    });
+
     it('uno pendiente solo lo ven su dueño y el admin', async () => {
       nodos.findOne.mockResolvedValue(
-        nodo({ estado: EstadoNodo.Pendiente }),
+        nodo({ estado: EstadoNodo.Pendiente, conFoto: true }),
       );
       fotos.findOne.mockResolvedValue(foto());
 

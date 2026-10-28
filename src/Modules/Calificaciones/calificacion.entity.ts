@@ -12,16 +12,6 @@ import {
 import { User } from '../Usuarios/user.entity';
 import { TipoCalificable, ValorCalificacion } from './calificacion.enum';
 
-/**
- * Pulgar arriba o abajo de una persona sobre una ruta, un nodo, un evento o un
- * area de un evento. La restriccion unica impone una calificacion por persona
- * y objeto (cambiarla es actualizar la fila).
- *
- * `clave` solo se usa con las areas de un evento: como viven dentro del evento
- * y no tienen id propio, se identifican por una huella de su trazo. Si la
- * empresa redibuja el area, la huella cambia y la calificacion vieja deja de
- * contar. Para el resto de objetos va vacia.
- */
 @Entity('calificaciones')
 @Unique('UQ_calificaciones_objeto_usuario', [
   'tipo',

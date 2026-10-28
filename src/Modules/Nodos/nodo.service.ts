@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   ConflictException,
@@ -235,10 +234,6 @@ export class NodoService {
     return guardado;
   }
 
-  /**
-   * Edita un nodo propio, sea de una empresa (patrocinado) o de un deportista.
-   * Se guarda directo: no vuelve a la cola de moderacion.
-   */
   async actualizar(
     id: number,
     dto: ActualizarNodoDto,
@@ -278,7 +273,6 @@ export class NodoService {
     return this.nodoRepository.save(nodo);
   }
 
-  /** Baja de un nodo: quien lo creo (empresa o deportista) o un admin. */
   async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
     const nodo = await this.findOne(id);
 
@@ -498,9 +492,10 @@ export class NodoService {
         nodo.creadoPor.id === actual.id ||
         esAdmin(actual));
 
-    const foto = puedeVer
-      ? await this.fotoRepository.findOne({ where: { nodoId: id } })
-      : null;
+    const foto =
+      puedeVer && (nodo.conFoto || esAdmin(actual))
+        ? await this.fotoRepository.findOne({ where: { nodoId: id } })
+        : null;
 
     if (!foto) {
       throw new NotFoundException(`El nodo ${id} no tiene foto`);

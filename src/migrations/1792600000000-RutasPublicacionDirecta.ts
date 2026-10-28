@@ -15,6 +15,5 @@ export class RutasPublicacionDirecta1792600000000
   }
 
   public async down(): Promise<void> {
-    // No hay vuelta atras: no se sabe cuales estaban pendientes ni cuales eran de amigos.
   }
 }

@@ -5,12 +5,19 @@
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { User } from '../Usuarios/user.entity';
 import { EstadoReporteContenido } from './estado-reporte-contenido.enum';
+import { ResolucionReporte } from './resolucion-reporte.enum';
 import { TipoContenidoReportado } from './tipo-contenido-reportado.enum';
 
 @Entity('reportes_contenido')
+@Unique('UQ_reportes_contenido_persona_contenido', [
+  'reportadoPor',
+  'tipoContenido',
+  'contenidoId',
+])
 export class ReporteContenido {
   @PrimaryGeneratedColumn()
   id: number;
@@ -30,6 +37,12 @@ export class ReporteContenido {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   descripcion: string | null;
+
+  @Column({ name: 'es_foto', type: 'boolean', default: false })
+  esFoto: boolean;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  resolucion: ResolucionReporte | null;
 
   @Column({
     type: 'varchar',

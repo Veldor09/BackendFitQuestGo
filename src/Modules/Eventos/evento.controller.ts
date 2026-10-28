@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   Body,
@@ -118,12 +117,6 @@ export class EventoController {
     return this.eventoService.actualizar(id, dto, actual);
   }
 
-
-  /**
-   * Foto del evento (una, opcional). Va aparte de `POST /eventos` para no mezclar el
-   * JSON validado con un archivo. Campo multipart `foto`; solo JPEG, PNG o
-   * WebP de hasta 3 MB.
-   */
   @Post(':id/foto')
   @UseGuards(GuardiaRoles)
   @Roles(RoleId.Empresa)
@@ -141,14 +134,16 @@ export class EventoController {
     return this.eventoService.guardarFoto(id, foto.buffer, actual);
   }
 
-  /** Bytes de la foto. */
   @Get(':id/foto')
   async verFoto(
     @Param('id', ParseIntPipe) id: number,
     @UsuarioActual() actual: UsuarioAutenticado,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const { contenido, tipoMime } = await this.eventoService.obtenerFoto(id);
+    const { contenido, tipoMime } = await this.eventoService.obtenerFoto(
+      id,
+      actual,
+    );
     res.set({
       'Content-Type': tipoMime,
       'Cache-Control': 'private, max-age=3600',

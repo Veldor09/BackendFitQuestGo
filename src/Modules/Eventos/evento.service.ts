@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   ForbiddenException,
@@ -41,7 +40,7 @@ export class EventoService {
   /** Lo que ve el deportista: eventos que no han terminado, el mas proximo primero. */
   findVigentes(): Promise<Evento[]> {
     return this.eventoRepository.find({
-      where: { fechaFin: MoreThanOrEqual(new Date()) },
+      where: { fechaFin: MoreThanOrEqual(new Date()), desactivado: false },
       order: { fechaInicio: 'ASC', id: 'ASC' },
     });
   }
@@ -134,11 +133,6 @@ export class EventoService {
     await this.eventoRepository.remove(evento);
   }
 
-
-  /**
-   * Adjunta (o reemplaza) la foto. Solo su dueno. Se confia en los bytes, no en
-   * lo que declare el archivo: solo JPEG, PNG o WebP de hasta 3 MB.
-   */
   async guardarFoto(
     id: number,
     datos: Buffer,
@@ -168,12 +162,15 @@ export class EventoService {
     return this.eventoRepository.save(objeto);
   }
 
-  /** Foto de un evento: la ve cualquier usuario autenticado. Sin foto: 404. */
   async obtenerFoto(
     id: number,
+    actual?: UsuarioAutenticado,
   ): Promise<{ contenido: Buffer; tipoMime: string }> {
-    await this.findOne(id);
-    const foto = await this.fotoRepository?.findOne({ where: { eventoId: id } });
+    const evento = await this.findOne(id);
+    const visible = evento.conFoto || (actual !== undefined && esAdmin(actual));
+    const foto = visible
+      ? await this.fotoRepository?.findOne({ where: { eventoId: id } })
+      : null;
     if (!foto) {
       throw new NotFoundException(`El evento ${id} no tiene foto`);
     }

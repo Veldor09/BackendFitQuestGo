@@ -17,13 +17,11 @@ export class CalificarDto {
   })
   valor: ValorCalificacion | typeof RETIRAR_CALIFICACION;
 
-  /** Solo al calificar un evento: indice del area que se califica. */
   @IsOptional()
   @IsInt({ message: 'area debe ser un entero' })
   @Min(0)
   area?: number;
 
-  /** Solo al calificar un nodo: el servidor valida que estes cerca. */
   @IsOptional()
   @IsLatitude({ message: 'lat debe ser una latitud valida' })
   lat?: number;
