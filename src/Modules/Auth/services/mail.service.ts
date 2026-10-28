@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { AuthConfig } from '../auth.config';
+import {
+  CorreoPlantilla,
+  plantillaCodigoRecuperacion,
+  plantillaReporteRecibido,
+  plantillaReporteResuelto,
+} from './plantillas-correo';
 
 @Injectable()
 export class MailService {
@@ -9,6 +15,7 @@ export class MailService {
     destinatario: string,
     asunto: string,
     texto: string,
+    html?: string,
   ): Promise<void> {
     const clave = this.config.sendgridApiKey;
     const remitente = this.config.correoRemitente;
@@ -28,7 +35,10 @@ export class MailService {
         personalizations: [{ to: [{ email: destinatario }] }],
         from: { email: remitente, name: 'FitQuest Go' },
         subject: asunto,
-        content: [{ type: 'text/plain', value: texto }],
+        content: [
+          { type: 'text/plain', value: texto },
+          ...(html ? [{ type: 'text/html', value: html }] : []),
+        ],
       }),
       signal: AbortSignal.timeout(10000),
     });
@@ -41,15 +51,40 @@ export class MailService {
     }
   }
 
-  async enviarCodigoRecuperacion(
+  enviarPlantilla(
+    destinatario: string,
+    plantilla: CorreoPlantilla,
+  ): Promise<void> {
+    return this.enviar(
+      destinatario,
+      plantilla.asunto,
+      plantilla.texto,
+      plantilla.html,
+    );
+  }
+
+  enviarCodigoRecuperacion(
     destinatario: string,
     codigo: string,
   ): Promise<void> {
-    await this.enviar(
+    return this.enviarPlantilla(
       destinatario,
-      'Codigo para restablecer tu contrasena',
-      `Tu codigo para restablecer la contrasena de FitQuest Go es: ${codigo}\n\n` +
-        'Vence en 15 minutos. Si no pediste este codigo, ignora este correo.',
+      plantillaCodigoRecuperacion(codigo),
+    );
+  }
+
+  enviarReporteRecibido(destinatario: string, que: string): Promise<void> {
+    return this.enviarPlantilla(destinatario, plantillaReporteRecibido(que));
+  }
+
+  enviarReporteResuelto(
+    destinatario: string,
+    que: string,
+    desactivado: boolean,
+  ): Promise<void> {
+    return this.enviarPlantilla(
+      destinatario,
+      plantillaReporteResuelto(que, desactivado),
     );
   }
 }

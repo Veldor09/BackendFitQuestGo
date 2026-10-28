@@ -268,12 +268,11 @@ export class ReporteContenidoService {
       throw error;
     }
 
-    this.enviarSinEsperar(
-      actual.email,
-      'Recibimos tu reporte',
-      `Recibimos tu reporte sobre ${this.descripcionCorreo(dto.tipoContenido, esFoto, contenido.nombre)}.\n\n` +
-        'Lo revisaremos y te avisaremos por este medio con lo que se decida.\n\n' +
-        'Gracias por ayudarnos a cuidar la comunidad de FitQuest Go.',
+    this.enviarSinEsperar(actual.email, (correo) =>
+      this.mail.enviarReporteRecibido(
+        correo,
+        this.descripcionCorreo(dto.tipoContenido, esFoto, contenido.nombre),
+      ),
     );
     return guardado;
   }
@@ -342,12 +341,8 @@ export class ReporteContenidoService {
       reporte.esFoto,
       contenido?.nombre ?? 'el contenido reportado',
     );
-    this.enviarSinEsperar(
-      reporte.reportadoPor.emailUser,
-      desactivar ? 'Revisamos tu reporte: se desactivó' : 'Revisamos tu reporte: se conserva',
-      desactivar
-        ? `Se ha desactivado ${que} porque, tras revisar tu reporte, sí infringe las normas de FitQuest Go.\n\nGracias por ayudarnos a cuidar la comunidad.`
-        : `No se ha desactivado ${que} porque, tras revisar tu reporte, no infringe las normas de FitQuest Go.\n\nGracias por ayudarnos a cuidar la comunidad.`,
+    this.enviarSinEsperar(reporte.reportadoPor.emailUser, (correo) =>
+      this.mail.enviarReporteResuelto(correo, que, desactivar),
     );
 
     return this.obtener(id);
@@ -430,13 +425,12 @@ export class ReporteContenidoService {
 
   private enviarSinEsperar(
     destinatario: string | undefined,
-    asunto: string,
-    texto: string,
+    envio: (destinatario: string) => Promise<void>,
   ): void {
     if (!destinatario) return;
-    this.mail.enviar(destinatario, asunto, texto).catch((error: unknown) => {
+    envio(destinatario).catch((error: unknown) => {
       this.logger.error(
-        `No se pudo enviar el correo "${asunto}": ${
+        `No se pudo enviar el correo del reporte: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
