@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
 import { AuthConfig } from '../auth.config';
 
 @Injectable()
@@ -11,25 +10,35 @@ export class MailService {
     asunto: string,
     texto: string,
   ): Promise<void> {
-    const usuario = this.config.gmailUser;
-    const clave = this.config.gmailAppPassword;
-    if (!usuario || !clave) {
+    const clave = this.config.sendgridApiKey;
+    const remitente = this.config.correoRemitente;
+    if (!clave || !remitente) {
       throw new Error(
-        'Correo no configurado: faltan GMAIL_USER y/o GMAIL_APP_PASSWORD en el .env',
+        'Correo no configurado: faltan SENDGRID_API_KEY y/o MAIL_FROM en el .env',
       );
     }
 
-    const transporte = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: usuario, pass: clave },
+    const respuesta = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${clave}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: destinatario }] }],
+        from: { email: remitente, name: 'FitQuest Go' },
+        subject: asunto,
+        content: [{ type: 'text/plain', value: texto }],
+      }),
+      signal: AbortSignal.timeout(10000),
     });
 
-    await transporte.sendMail({
-      from: `"FitQuest Go" <${usuario}>`,
-      to: destinatario,
-      subject: asunto,
-      text: texto,
-    });
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text().catch(() => '');
+      throw new Error(
+        `SendGrid rechazo el envio (${respuesta.status}): ${detalle}`,
+      );
+    }
   }
 
   async enviarCodigoRecuperacion(
