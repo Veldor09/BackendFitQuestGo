@@ -26,7 +26,12 @@ describe('SuscripcionesService - avisos al decidir una solicitud', () => {
           return {
             findOne: jest
               .fn()
-              .mockResolvedValue({ id: 1, duracionDias: 45, activo: true }),
+              .mockResolvedValue({
+                id: 1,
+                duracionDias: 45,
+                activo: true,
+                audiencia: 'usuario',
+              }),
           };
         }
         if (entidad === PrecioPatrocinio) {
@@ -76,7 +81,7 @@ describe('SuscripcionesService - avisos al decidir una solicitud', () => {
   it('al aprobar avisa al dueno del plan con los dias reales del plan', async () => {
     await servicio.aprobarSuscripcion(25, 3);
 
-    expect(avisos.planAprobado).toHaveBeenCalledWith(10, 25, 45);
+    expect(avisos.planAprobado).toHaveBeenCalledWith(10, 25, 45, 'usuario');
   });
 
   it('al rechazar avisa al dueno del plan con el motivo que escribio el admin', async () => {

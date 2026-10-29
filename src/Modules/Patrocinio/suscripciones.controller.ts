@@ -11,6 +11,7 @@ import {
 
 import { GuardiaJwt } from '../Auth/guards/jwt.guard';
 import type { RequestAutenticado } from '../Auth/types/request-autenticado';
+import { audienciaParaRol } from './pago';
 import { SolicitarSuscripcionDto } from './solicitar-suscripcion.dto';
 import { SuscripcionesService } from './suscripciones.service';
 
@@ -21,9 +22,16 @@ export class SuscripcionesController {
     private readonly suscripcionesService: SuscripcionesService,
   ) {}
 
+  /** Los planes que le tocan a quien pregunta (empresa o usuario) en [pais]. */
   @Get('planes')
-  consultarPlanes(@Query('pais') pais?: string) {
-    return this.suscripcionesService.consultarPlanes(pais);
+  consultarPlanes(
+    @Query('pais') pais?: string,
+    @Req() request?: RequestAutenticado,
+  ) {
+    return this.suscripcionesService.consultarPlanes(
+      pais,
+      request ? audienciaParaRol(request.usuario.rol) : undefined,
+    );
   }
 
   /** Mi suscripcion mas reciente, o `null` si nunca pedi una. */
@@ -40,6 +48,7 @@ export class SuscripcionesController {
     return this.suscripcionesService.solicitarSuscripcion(
       request.usuario.id,
       dto,
+      request.usuario.rol,
     );
   }
 }

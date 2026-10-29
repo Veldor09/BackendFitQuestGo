@@ -34,7 +34,10 @@ describe('SuscripcionesController - consulta de planes', () => {
   it('consulta los planes utilizando el país recibido', async () => {
     const resultado = await controlador.consultarPlanes('CR');
 
-    expect(suscripcionesService.consultarPlanes).toHaveBeenCalledWith('CR');
+    expect(suscripcionesService.consultarPlanes).toHaveBeenCalledWith(
+      'CR',
+      undefined,
+    );
     expect(resultado.moneda).toBe('CRC');
     expect(resultado.planes).toHaveLength(1);
   });
@@ -44,6 +47,30 @@ describe('SuscripcionesController - consulta de planes', () => {
 
     expect(suscripcionesService.consultarPlanes).toHaveBeenCalledWith(
       undefined,
+      undefined,
+    );
+  });
+
+  it('pide solo los planes que le tocan al tipo de cuenta de quien pregunta', async () => {
+    const comoUsuario = {
+      usuario: { id: 1, email: 'u@x.co', rol: 1 },
+    } as RequestAutenticado;
+    const comoEmpresa = {
+      usuario: { id: 2, email: 'e@x.co', rol: 2 },
+    } as RequestAutenticado;
+
+    await controlador.consultarPlanes('CR', comoUsuario);
+    await controlador.consultarPlanes('CR', comoEmpresa);
+
+    expect(suscripcionesService.consultarPlanes).toHaveBeenNthCalledWith(
+      1,
+      'CR',
+      'usuario',
+    );
+    expect(suscripcionesService.consultarPlanes).toHaveBeenNthCalledWith(
+      2,
+      'CR',
+      'empresa',
     );
   });
 
@@ -127,6 +154,7 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
     expect(suscripcionesService.solicitarSuscripcion).toHaveBeenCalledWith(
       10,
       dto,
+      1,
     );
   });
 
@@ -139,6 +167,7 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
         planId: 1,
         pais: 'CR',
       },
+      1,
     );
   });
 
@@ -154,6 +183,7 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
     expect(suscripcionesService.solicitarSuscripcion).toHaveBeenCalledWith(
       10,
       datos,
+      1,
     );
 
     expect(suscripcionesService.solicitarSuscripcion).not.toHaveBeenCalledWith(

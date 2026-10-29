@@ -9,6 +9,7 @@ import { SuscripcionesService } from './suscripciones.service';
 describe('SuscripcionesService.miSuscripcion', () => {
   let suscripciones: { findOne: jest.Mock };
   let planes: { findOne: jest.Mock };
+  let precios: { findOne: jest.Mock };
   let servicio: SuscripcionesService;
 
   const DIA = 24 * 60 * 60 * 1000;
@@ -31,9 +32,10 @@ describe('SuscripcionesService.miSuscripcion', () => {
     planes = {
       findOne: jest.fn().mockResolvedValue({ id: 1, nombre: 'Plan Mensual' }),
     };
+    precios = { findOne: jest.fn().mockResolvedValue({ importe: '10000.00' }) };
     servicio = new SuscripcionesService(
       planes as unknown as Repository<PlanPatrocinio>,
-      {} as Repository<PrecioPatrocinio>,
+      precios as unknown as Repository<PrecioPatrocinio>,
       suscripciones as unknown as Repository<Suscripcion>,
       {} as Repository<RenovacionSuscripcion>,
       {} as AuditoriaService,

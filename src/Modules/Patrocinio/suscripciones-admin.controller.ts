@@ -2,9 +2,11 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseIntPipe,
   Patch,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -25,6 +27,23 @@ export class SuscripcionesAdminController {
   constructor(
     private readonly suscripcionesService: SuscripcionesService,
   ) {}
+
+  /** Las solicitudes y planes, mas nuevas primero (`?estado=` y `?q=`). */
+  @Get()
+  listar(@Query('estado') estado?: string, @Query('q') q?: string) {
+    return this.suscripcionesService.listarSuscripciones({ estado, q });
+  }
+
+  @Patch(':id/suspender')
+  suspenderSuscripcion(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() administrador: UsuarioAutenticado,
+  ) {
+    return this.suscripcionesService.suspenderSuscripcion(
+      id,
+      administrador.id,
+    );
+  }
 
   @Patch(':id/aprobar')
   aprobarSuscripcion(

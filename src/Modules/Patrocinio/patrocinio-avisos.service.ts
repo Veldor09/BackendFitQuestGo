@@ -21,17 +21,26 @@ const TITULO_POR_VENCER = 'Tu plan de patrocinio vence pronto';
 export class PatrocinioAvisosService {
   constructor(private readonly notificaciones: NotificacionesService) {}
 
-  /** [dias] es lo que dura el plan aprobado (por defecto 30). */
+  /**
+   * [dias] es lo que dura el plan aprobado (por defecto 30). Segun la
+   * [audiencia] el aviso dice que se gana: destacar (empresa) o descargar mas
+   * cosas sin conexion (usuario).
+   */
   async planAprobado(
     usuarioId: number,
     suscripcionId: number,
     dias = 30,
+    audiencia: 'empresa' | 'usuario' = 'empresa',
   ): Promise<void> {
     await this.avisar(
       usuarioId,
       suscripcionId,
-      'Tu plan de patrocinio fue aprobado',
-      `Ya puedes destacar tus comercios y eventos durante ${dias} días.`,
+      audiencia === 'usuario'
+        ? 'Tu suscripción fue aprobada'
+        : 'Tu plan de patrocinio fue aprobado',
+      audiencia === 'usuario'
+        ? `Ya puedes guardar más rutas sin conexión durante ${dias} días.`
+        : `Ya puedes destacar tus comercios y eventos durante ${dias} días.`,
       { tipo: TipoPush.PlanAprobado },
     );
   }

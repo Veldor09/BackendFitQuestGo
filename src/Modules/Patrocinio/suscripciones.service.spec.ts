@@ -71,10 +71,14 @@ describe('SuscripcionesService - consulta de planes', () => {
     expect(resultado).toEqual({
       pais: 'CR',
       moneda: 'CRC',
+      metodoPago: 'sinpe',
+      pagoDisponible: true,
+      sinpeNumero: '83722969',
       planes: [
         {
           id: 1,
           nombre: 'Patrocinio mensual',
+          audiencia: undefined,
           duracionDias: 30,
           moneda: 'CRC',
           importe: '10000.00',
@@ -260,6 +264,7 @@ describe('SuscripcionesService - solicitud de suscripcion', () => {
       usuarioId: 10,
       planId: 1,
       estado: 'Solicitada',
+      numeroSolicitud: expect.stringMatching(/^[1-9]\d{5}$/),
       pais: 'CR',
       moneda: 'CRC',
       precioAplicado: null,
@@ -272,6 +277,11 @@ describe('SuscripcionesService - solicitud de suscripcion', () => {
 
     expect(resultado).toEqual({
       ...suscripcionGuardada,
+      // El numero lo genera el servicio (el repositorio falso no lo devuelve).
+      numeroSolicitud: undefined,
+      monto: '10000.00',
+      metodoPago: 'sinpe',
+      sinpeNumero: '83722969',
       mensaje: 'Solicitud de patrocinio registrada correctamente',
     });
   });

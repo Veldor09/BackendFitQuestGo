@@ -18,6 +18,10 @@ export class PlanPatrocinio {
   @Column({ name: 'duracion_dias', type: 'int', default: 30 })
   duracionDias: number;
 
+  /** A quien va dirigido: `empresa` (destacar) o `usuario` (mas descargas offline). */
+  @Column({ type: 'varchar', length: 10, default: 'empresa' })
+  audiencia: 'empresa' | 'usuario';
+
   @Column({ type: 'boolean', default: true })
   activo: boolean;
 
