@@ -24,7 +24,6 @@ import {
 import { Calificacion } from './calificacion.entity';
 import { CalificarDto } from './dto/CalificacionDTO';
 
-/** Por que quien consulta no puede calificar (la app lo traduce). */
 export type MotivoSinCalificar = 'sin_recorrido' | 'propio' | 'no_disponible';
 
 export interface ResumenCalificacion {
@@ -36,13 +35,11 @@ export interface ResumenCalificacion {
 }
 
 export interface ResumenArea extends ResumenCalificacion {
-  /** Posicion del area en `Evento.areas`. */
   indice: number;
 }
 
 export type ResumenEvento = ResumenCalificacion & { areas: ResumenArea[] };
 
-/** Huella corta del trazo de un area: la identifica mientras no se redibuje. */
 export const claveDeArea = (zona: ZonaEvento): string =>
   createHash('sha1')
     .update(JSON.stringify(zona.puntos))
@@ -74,7 +71,6 @@ export class CalificacionService {
     private readonly eventos: Repository<Evento>,
   ) {}
 
-  /** Conteo y estado de quien consulta sobre una ruta, un nodo o un evento. */
   resumen(
     tipo: TipoCalificable,
     id: number,
@@ -90,13 +86,6 @@ export class CalificacionService {
     }
   }
 
-  /**
-   * Pone, cambia o retira la calificacion de quien consulta y devuelve el
-   * resumen ya actualizado. Reglas:
-   * - Ruta: solo si registraste un recorrido de ella (iniciar y finalizar).
-   * - Nodo: aprobado, no propio y a `RADIO_VOTO_METROS` o menos.
-   * - Evento (o un area suya): no propio.
-   */
   async calificar(
     tipo: TipoCalificable,
     id: number,
@@ -194,7 +183,6 @@ export class CalificacionService {
         this.calificaciones.create({ ...donde, valor }),
       );
     } catch (error) {
-      // Dos toques casi a la vez: el segundo ya no inserta, cambia el valor.
       if (!esViolacionDeUnicidad(error)) throw error;
       await this.calificaciones.update(donde, { valor });
     }
@@ -253,7 +241,6 @@ export class CalificacionService {
     };
   }
 
-  /** Conteo por clave (vacia para el objeto en si) y la calificacion de `usuarioId`. */
   private async contar(
     tipo: TipoCalificable,
     objetoId: number,

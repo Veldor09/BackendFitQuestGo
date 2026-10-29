@@ -1,5 +1,4 @@
-﻿
-import { ForbiddenException } from '@nestjs/common';
+﻿import { ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import { UserController } from './user.controller';
@@ -11,6 +10,7 @@ describe('UserController - Auditoria administrativa', () => {
 
   let usuarios: {
     createUser: jest.Mock;
+    findOneUser: jest.Mock;
     updateUser: jest.Mock;
     cambiarEstado: jest.Mock;
   };
@@ -42,8 +42,15 @@ describe('UserController - Auditoria administrativa', () => {
 
     usuarios = {
       createUser: jest.fn().mockResolvedValue({ id: 25 }),
-      updateUser: jest.fn().mockResolvedValue({ id: 25 }),
-      cambiarEstado: jest.fn().mockResolvedValue({ id: 25 }),
+      findOneUser: jest
+        .fn()
+        .mockResolvedValue({ id: 25, estado: EstadoUsuario.Activado }),
+      updateUser: jest
+        .fn()
+        .mockResolvedValue({ id: 25, estado: EstadoUsuario.Activado }),
+      cambiarEstado: jest
+        .fn()
+        .mockResolvedValue({ id: 25, estado: EstadoUsuario.Desactivado }),
     };
 
     auditoria = {
@@ -51,11 +58,12 @@ describe('UserController - Auditoria administrativa', () => {
     };
 
     dataSource = {
-      transaction: jest.fn().mockImplementation(
-        async (
-          callback: (manager: EntityManager) => Promise<unknown>,
-        ) => callback(manager),
-      ),
+      transaction: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(manager),
+        ),
     };
 
     controller = new UserController(
@@ -66,17 +74,11 @@ describe('UserController - Auditoria administrativa', () => {
   });
 
   it('audita la creacion de usuarios dentro de una transaccion', async () => {
-    const resultado = await controller.create(
-      {} as any,
-      admin,
-    );
+    const resultado = await controller.create({} as any, admin);
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
 
-    expect(usuarios.createUser).toHaveBeenCalledWith(
-      {},
-      manager,
-    );
+    expect(usuarios.createUser).toHaveBeenCalledWith({}, manager);
 
     expect(auditoria.registrar).toHaveBeenCalledWith(
       {
@@ -84,6 +86,15 @@ describe('UserController - Auditoria administrativa', () => {
         accion: 'USUARIO_CREADO',
         entidad: 'USUARIO',
         entidadId: 25,
+        detalle: {
+          datosRegistrados: {
+            nombreUser: null,
+            emailUser: null,
+            telefono: null,
+            idrol: null,
+            estado: null,
+          },
+        },
       },
       manager,
     );
@@ -92,19 +103,11 @@ describe('UserController - Auditoria administrativa', () => {
   });
 
   it('audita las actualizaciones administrativas dentro de una transaccion', async () => {
-    const resultado = await controller.update(
-      25,
-      {} as any,
-      admin,
-    );
+    const resultado = await controller.update(25, {} as any, admin);
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
 
-    expect(usuarios.updateUser).toHaveBeenCalledWith(
-      25,
-      {},
-      manager,
-    );
+    expect(usuarios.updateUser).toHaveBeenCalledWith(25, {}, manager);
 
     expect(auditoria.registrar).toHaveBeenCalledWith(
       {
@@ -112,24 +115,18 @@ describe('UserController - Auditoria administrativa', () => {
         accion: 'USUARIO_ACTUALIZADO',
         entidad: 'USUARIO',
         entidadId: 25,
+        detalle: { cambios: {} },
       },
       manager,
     );
 
-    expect(resultado).toEqual({ id: 25 });
+    expect(resultado).toEqual({ id: 25, estado: EstadoUsuario.Activado });
   });
 
   it('no audita una actualizacion personal', async () => {
-    await controller.update(
-      25,
-      {} as any,
-      normal,
-    );
+    await controller.update(25, {} as any, normal);
 
-    expect(usuarios.updateUser).toHaveBeenCalledWith(
-      25,
-      {},
-    );
+    expect(usuarios.updateUser).toHaveBeenCalledWith(25, {});
 
     expect(dataSource.transaction).not.toHaveBeenCalled();
 
@@ -160,23 +157,24 @@ describe('UserController - Auditoria administrativa', () => {
         entidad: 'USUARIO',
         entidadId: 25,
         detalle: {
-          estado: EstadoUsuario.Desactivado,
+          cambios: {
+            estado: {
+              anterior: EstadoUsuario.Activado,
+              nuevo: EstadoUsuario.Desactivado,
+            },
+          },
         },
       },
       manager,
     );
 
-    expect(resultado).toEqual({ id: 25 });
+    expect(resultado).toEqual({ id: 25, estado: EstadoUsuario.Desactivado });
   });
 
   it('impide que un usuario modifique otra cuenta', async () => {
-    await expect(
-      controller.update(
-        30,
-        {} as any,
-        normal,
-      ),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(controller.update(30, {} as any, normal)).rejects.toThrow(
+      ForbiddenException,
+    );
 
     expect(usuarios.updateUser).not.toHaveBeenCalled();
 
@@ -186,17 +184,11 @@ describe('UserController - Auditoria administrativa', () => {
   });
 
   it('no registra operaciones que fallan', async () => {
-    usuarios.updateUser.mockRejectedValue(
-      new Error('Fallo de actualizacion'),
-    );
+    usuarios.updateUser.mockRejectedValue(new Error('Fallo de actualizacion'));
 
-    await expect(
-      controller.update(
-        25,
-        {} as any,
-        admin,
-      ),
-    ).rejects.toThrow('Fallo de actualizacion');
+    await expect(controller.update(25, {} as any, admin)).rejects.toThrow(
+      'Fallo de actualizacion',
+    );
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
 
@@ -204,23 +196,15 @@ describe('UserController - Auditoria administrativa', () => {
   });
 
   it('propaga un fallo de auditoria durante la creacion', async () => {
-    auditoria.registrar.mockRejectedValue(
-      new Error('Fallo de auditoria'),
-    );
+    auditoria.registrar.mockRejectedValue(new Error('Fallo de auditoria'));
 
-    await expect(
-      controller.create(
-        {} as any,
-        admin,
-      ),
-    ).rejects.toThrow('Fallo de auditoria');
+    await expect(controller.create({} as any, admin)).rejects.toThrow(
+      'Fallo de auditoria',
+    );
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
 
-    expect(usuarios.createUser).toHaveBeenCalledWith(
-      {},
-      manager,
-    );
+    expect(usuarios.createUser).toHaveBeenCalledWith({}, manager);
 
     expect(auditoria.registrar).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -232,31 +216,19 @@ describe('UserController - Auditoria administrativa', () => {
   });
 
   it('propaga un fallo de auditoria durante la actualizacion', async () => {
-    auditoria.registrar.mockRejectedValue(
-      new Error('Fallo de auditoria'),
-    );
+    auditoria.registrar.mockRejectedValue(new Error('Fallo de auditoria'));
 
-    await expect(
-      controller.update(
-        25,
-        {} as any,
-        admin,
-      ),
-    ).rejects.toThrow('Fallo de auditoria');
+    await expect(controller.update(25, {} as any, admin)).rejects.toThrow(
+      'Fallo de auditoria',
+    );
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
 
-    expect(usuarios.updateUser).toHaveBeenCalledWith(
-      25,
-      {},
-      manager,
-    );
+    expect(usuarios.updateUser).toHaveBeenCalledWith(25, {}, manager);
   });
 
   it('propaga un fallo de auditoria durante el cambio de estado', async () => {
-    auditoria.registrar.mockRejectedValue(
-      new Error('Fallo de auditoria'),
-    );
+    auditoria.registrar.mockRejectedValue(new Error('Fallo de auditoria'));
 
     await expect(
       controller.cambiarEstado(

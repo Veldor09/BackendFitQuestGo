@@ -108,16 +108,16 @@ const PLANTILLAS: Record<TipoPush, Record<IdiomaPush, Plantilla>> = {
   },
   [TipoPush.PlanAprobado]: {
     es: () => ({
-      titulo: 'Tu plan de patrocinio fue aprobado',
-      cuerpo: 'Ya puedes destacar tus comercios y eventos.',
+      titulo: 'Tu suscripción fue aprobada',
+      cuerpo: 'Tu plan ya está activo.',
     }),
     en: () => ({
-      titulo: 'Your sponsorship plan was approved',
-      cuerpo: 'You can now feature your businesses and events.',
+      titulo: 'Your subscription was approved',
+      cuerpo: 'Your plan is now active.',
     }),
     pt: () => ({
-      titulo: 'Seu plano de patrocínio foi aprovado',
-      cuerpo: 'Agora você pode destacar seus comércios e eventos.',
+      titulo: 'Sua assinatura foi aprovada',
+      cuerpo: 'Seu plano já está ativo.',
     }),
   },
   [TipoPush.PlanRechazado]: {

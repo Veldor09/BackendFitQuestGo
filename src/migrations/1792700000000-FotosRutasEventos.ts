@@ -1,6 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/** Una foto opcional por ruta y por evento (en la base, como las de los nodos). */
 export class FotosRutasEventos1792700000000 implements MigrationInterface {
   name = 'FotosRutasEventos1792700000000';
 

@@ -21,11 +21,11 @@ export class AuthConfig {
     return this.config.get<string>('COOKIE_SECURE', 'false') === 'true';
   }
 
-  get gmailUser(): string | undefined {
-    return this.config.get<string>('GMAIL_USER');
+  get sendgridApiKey(): string | undefined {
+    return this.config.get<string>('SENDGRID_API_KEY');
   }
 
-  get gmailAppPassword(): string | undefined {
-    return this.config.get<string>('GMAIL_APP_PASSWORD');
+  get correoRemitente(): string | undefined {
+    return this.config.get<string>('MAIL_FROM');
   }
 }

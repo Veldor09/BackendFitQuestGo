@@ -1,4 +1,3 @@
-
 import {
   Column,
   CreateDateColumn,
@@ -45,7 +44,6 @@ export class Ruta {
   @Column({ type: 'varchar', length: 20, default: 'privada' })
   visibilidad: string;
 
-  // Hay una foto en `ruta_fotos` (los bytes no viajan al listar rutas).
   @Column({ name: 'con_foto', type: 'boolean', default: false })
   conFoto: boolean;
 

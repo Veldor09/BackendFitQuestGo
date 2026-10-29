@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   ForbiddenException,
@@ -219,8 +218,6 @@ export class RutaService {
     // ADM-11: comprobar todas las actividades antes de guardar.
     await this.validarActividadesActivas(dto.actividades);
 
-    // Solo hay rutas privadas o publicas, y una publica sale de inmediato: no
-    // pasa por moderacion.
     const visibilidad = dto.visibilidad === 'publica' ? 'publica' : 'privada';
 
     const estado =
@@ -275,11 +272,6 @@ export class RutaService {
     return guardada;
   }
 
-  /**
-   * Publica una ruta privada de inmediato (RTE-07). Solo el dueno. No hay
-   * cola de moderacion: la ruta queda visible para la comunidad al instante.
-   * El nombre se conserva por compatibilidad con `PATCH /rutas/:id/publicar`.
-   */
   async solicitarPublicacion(
     id: number,
     usuarioId: number,
@@ -317,10 +309,6 @@ export class RutaService {
     return actualizada;
   }
 
-  /**
-   * Elimina una ruta: su dueno o un admin. Se van con ella sus recorridos y
-   * las veces que alguien la guardo como favorita (borrado en cascada).
-   */
   async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {
     const ruta = await this.findOne(id);
 
@@ -331,11 +319,6 @@ export class RutaService {
     await this.rutaRepository.remove(ruta);
   }
 
-  /**
-   * Moderacion posterior (ADM-05): solo admin. Las rutas se publican solas, asi
-   * que el admin ya no las aprueba: solo puede retirarlas (Rechazada) o volver
-   * a ponerlas privadas.
-   */
   async cambiarEstado(
     id: number,
     estado: EstadoRuta,
@@ -397,12 +380,6 @@ export class RutaService {
     return actualizada;
   }
 
-
-
-  /**
-   * Adjunta (o reemplaza) la foto. Solo su dueno. Se confia en los bytes, no en
-   * lo que declare el archivo: solo JPEG, PNG o WebP de hasta 3 MB.
-   */
   async guardarFoto(
     id: number,
     datos: Buffer,
@@ -432,10 +409,6 @@ export class RutaService {
     return this.rutaRepository.save(objeto);
   }
 
-  /**
-   * Foto de una ruta. La ve quien puede ver la ruta (`verRuta`): una publicada,
-   * cualquiera; una privada, solo su dueno. Sin foto o sin permiso: 404.
-   */
   async obtenerFoto(
     id: number,
     actual: UsuarioAutenticado,

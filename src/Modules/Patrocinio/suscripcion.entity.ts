@@ -48,6 +48,13 @@ export class Suscripcion {
   })
   estado: EstadoSuscripcion;
 
+  /**
+   * Numero de 6 digitos que la persona escribe en el detalle del SINPE Movil:
+   * con el, el administrador encuentra la solicitud para activarla.
+   */
+  @Column({ name: 'numero_solicitud', type: 'varchar', length: 6, nullable: true })
+  numeroSolicitud: string | null;
+
   @Column({ type: 'varchar', length: 2 })
   pais: string;
 

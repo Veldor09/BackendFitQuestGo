@@ -7,6 +7,8 @@ export enum EstadoAlerta {
   Activa = 'Activa',
   Resuelta = 'Resuelta',
   Expirada = 'Expirada',
+
+  Desactivada = 'Desactivada',
 }
 
 /** Gravedad reportada por quien crea la alerta; determina el TTL por defecto. */
