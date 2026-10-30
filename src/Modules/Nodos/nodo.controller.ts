@@ -83,6 +83,14 @@ export class NodoController {
     return this.destacados.destacarNodo(id, actual, dto.destacar);
   }
 
+  /** Consulta administrativa de todos los nodos (ADM-07). */
+  @Get('admin')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodosAdmin(): Promise<Nodo[]> {
+    return this.nodoService.findTodosAdmin();
+  }
+
   @Get('pendientes')
   @UseGuards(GuardiaRoles)
   @Roles(RoleId.Admin)

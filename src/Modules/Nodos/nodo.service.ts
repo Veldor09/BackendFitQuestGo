@@ -136,6 +136,16 @@ export class NodoService {
     );
   }
 
+  /** Listado completo de nodos para administradores (ADM-07). */
+  findTodosAdmin(): Promise<Nodo[]> {
+    return this.nodoRepository
+      .createQueryBuilder('nodo')
+      .leftJoin('nodo.creadoPor', 'creadoPor')
+      .addSelect(['creadoPor.id', 'creadoPor.nombreUser'])
+      .orderBy('nodo.id', 'DESC')
+      .getMany();
+  }
+
   /** Cola de moderacion (ADM-07). */
   findPendientes(): Promise<Nodo[]> {
     return this.nodoRepository.find({

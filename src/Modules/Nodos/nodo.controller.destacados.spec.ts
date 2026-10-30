@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { GuardiaJwt } from '../Auth/guards/jwt.guard';
+import { GuardiaRoles } from '../Auth/guards/roles.guard';
+import { CLAVE_ROLES } from '../Auth/decorators/roles.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { DestacadosService } from '../Patrocinio/destacados.service';
 import { RoleId } from '../Usuarios/roles.enum';
@@ -21,6 +23,7 @@ describe('NodoController — destacados', () => {
   beforeEach(() => {
     nodoService = {
       findAprobados: jest.fn(),
+      findTodosAdmin: jest.fn(),
       findMisNodos: jest.fn(),
       confirmar: jest.fn(),
       marcarObsoleto: jest.fn(),
@@ -91,6 +94,29 @@ describe('NodoController — destacados', () => {
       controlador.destacar(5, { destacar: true }, actual),
     ).resolves.toEqual({ id: 5, destacarActivado: true, destacado: true });
     expect(destacados.destacarNodo).toHaveBeenCalledWith(5, actual, true);
+  });
+
+  it('GET /nodos/admin consulta todos los nodos', async () => {
+    const puntos = [{ id: 2 }, { id: 1 }];
+    nodoService.findTodosAdmin.mockResolvedValue(puntos);
+
+    await expect(controlador.findTodosAdmin()).resolves.toEqual(puntos);
+    expect(nodoService.findTodosAdmin).toHaveBeenCalledTimes(1);
+  });
+
+  it('GET /nodos/admin requiere el rol administrador', () => {
+    const metodo = NodoController.prototype.findTodosAdmin;
+
+    const guardias = Reflect.getMetadata('__guards__', metodo) as
+      | unknown[]
+      | undefined;
+
+    const roles = Reflect.getMetadata(CLAVE_ROLES, metodo) as
+      | RoleId[]
+      | undefined;
+
+    expect(guardias).toContain(GuardiaRoles);
+    expect(roles).toEqual([RoleId.Admin]);
   });
 
   it('exige iniciar sesion', () => {
