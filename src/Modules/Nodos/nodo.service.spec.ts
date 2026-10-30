@@ -652,6 +652,47 @@ describe('NodoService', () => {
     });
   });
 
+  describe('findTodosAdmin', () => {
+    it('consulta todos los estados y limita los campos del creador', async () => {
+      const puntos = [
+        nodo({ id: 4, estado: EstadoNodo.Obsoleto }),
+        nodo({ id: 3, estado: EstadoNodo.Rechazado }),
+        nodo({ id: 2, estado: EstadoNodo.Aprobado }),
+        nodo({ id: 1, estado: EstadoNodo.Pendiente }),
+      ];
+
+      const consulta = {
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(puntos),
+      };
+
+      nodos.createQueryBuilder.mockReturnValue(consulta);
+
+      const resultado = await service.findTodosAdmin();
+
+      expect(resultado).toEqual(puntos);
+      expect(resultado.map((n) => n.estado)).toEqual([
+        EstadoNodo.Obsoleto,
+        EstadoNodo.Rechazado,
+        EstadoNodo.Aprobado,
+        EstadoNodo.Pendiente,
+      ]);
+      expect(nodos.createQueryBuilder).toHaveBeenCalledWith('nodo');
+      expect(consulta.leftJoin).toHaveBeenCalledWith(
+        'nodo.creadoPor',
+        'creadoPor',
+      );
+      expect(consulta.addSelect).toHaveBeenCalledWith([
+        'creadoPor.id',
+        'creadoPor.nombreUser',
+      ]);
+      expect(consulta.orderBy).toHaveBeenCalledWith('nodo.id', 'DESC');
+      expect(consulta.getMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('findAprobados', () => {
     const constructorDeConsulta = (puntos: Nodo[]) => {
       const consulta = {
