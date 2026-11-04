@@ -25,7 +25,7 @@ import {
   detectarTipoImagen,
   MAX_FOTO_BYTES,
 } from '../Nodos/imagen.util';
-import { CrearRutaDto } from './dto/RutaDTO';
+import { ActualizarRutaDto, CrearRutaDto } from './dto/RutaDTO';
 import { EstadoRuta } from './estado-ruta.enum';
 import { RutaFavorita } from './ruta-favorita.entity';
 import { RutaFoto } from './ruta-foto.entity';
@@ -307,6 +307,51 @@ export class RutaService {
     }
 
     return actualizada;
+  }
+
+  
+  async actualizar(
+    id: number,
+    dto: ActualizarRutaDto,
+    actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
+    const ruta = await this.findOne(id);
+
+    if (ruta.creadoPor.id !== actual.id && !esAdmin(actual)) {
+      throw new ForbiddenException('Esta ruta no te pertenece');
+    }
+
+    if (dto.actividades !== undefined) {
+      await this.validarActividadesActivas(dto.actividades);
+      ruta.actividades = dto.actividades;
+    }
+
+    if (dto.nombre !== undefined) {
+      ruta.nombre = dto.nombre.trim();
+    }
+
+    if (dto.dificultad !== undefined) {
+      ruta.dificultad = dto.dificultad;
+    }
+
+    if (dto.distanciaKm !== undefined) {
+      ruta.distanciaKm = dto.distanciaKm;
+    }
+
+    if (dto.puntos !== undefined) {
+      ruta.puntos = dto.puntos;
+    }
+
+    if (dto.visibilidad !== undefined) {
+      ruta.visibilidad = dto.visibilidad === 'publica' ? 'publica' : 'privada';
+      if (ruta.visibilidad === 'publica' && ruta.estado === EstadoRuta.Privada) {
+        ruta.estado = EstadoRuta.Publicada;
+      } else if (ruta.visibilidad === 'privada' && ruta.estado === EstadoRuta.Publicada) {
+        ruta.estado = EstadoRuta.Privada;
+      }
+    }
+
+    return this.rutaRepository.save(ruta);
   }
 
   async eliminar(id: number, actual: UsuarioAutenticado): Promise<void> {

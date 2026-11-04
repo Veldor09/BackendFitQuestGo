@@ -1,3 +1,4 @@
+import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
@@ -77,3 +78,4 @@ export class CambiarEstadoRutaDto {
   })
   estado: EstadoRuta;
 }
+export class ActualizarRutaDto extends PartialType(CrearRutaDto) {}
