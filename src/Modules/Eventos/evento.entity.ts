@@ -23,6 +23,7 @@ export interface PuntoGeo {
 export interface ZonaEvento {
   nombre: string;
   puntos: PuntoGeo[];
+  estado?: 'Pendiente' | 'Aprobado' | 'Denegado';
 }
 
 @Entity('eventos')

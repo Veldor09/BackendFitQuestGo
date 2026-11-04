@@ -177,6 +177,10 @@ export class RutaService {
     });
   }
 
+  findTodasAdmin(): Promise<Ruta[]> {
+    return this.rutaRepository.find({ order: { id: 'DESC' } });
+  }
+
   async findOne(id: number): Promise<Ruta> {
     const ruta = await this.rutaRepository.findOne({
       where: { id },

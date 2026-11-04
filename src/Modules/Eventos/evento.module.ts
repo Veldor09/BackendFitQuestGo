@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeguridadModule } from '../Auth/seguridad.module';
+import { AuthModule } from '../Auth/auth.module';
 import { PatrocinioModule } from '../Patrocinio/patrocinio.module';
 import { Evento } from './evento.entity';
 import { EventoFoto } from './evento-foto.entity';
@@ -11,6 +12,7 @@ import { EventoService } from './evento.service';
   imports: [
     TypeOrmModule.forFeature([Evento, EventoFoto]),
     SeguridadModule,
+    AuthModule,
     PatrocinioModule,
   ],
   controllers: [EventoController],
