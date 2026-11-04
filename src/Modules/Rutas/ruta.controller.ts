@@ -63,6 +63,13 @@ export class RutaController {
     return this.rutaService.findPendientes();
   }
 
+  @Get('admin/todas')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodasAdmin(): Promise<Ruta[]> {
+    return this.rutaService.findTodasAdmin();
+  }
+
   /** Una ruta publicada la ve cualquiera; el resto, solo su dueno y el admin. */
   @Get(':id')
   verRuta(

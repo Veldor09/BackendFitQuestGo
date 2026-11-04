@@ -100,6 +100,10 @@ export class NodoService {
     });
   }
 
+  findTodosAdmin(): Promise<Nodo[]> {
+    return this.nodoRepository.find({ order: { id: 'DESC' } });
+  }
+
   findMisNodos(usuarioId: number): Promise<Nodo[]> {
     return this.nodoRepository.find({
       where: { creadoPor: { id: usuarioId } },

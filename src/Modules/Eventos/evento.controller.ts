@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -40,9 +41,32 @@ export class EventoController {
     return this.eventoService.findMios(actual.id);
   }
 
+  @Get('admin/todos')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodosAdmin(): Promise<Evento[]> {
+    return this.eventoService.findTodosAdmin();
+  }
+
+  @Patch('admin/:id/:tipo/:indice/estado')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  decidirZona(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tipo') tipo: string,
+    @Param('indice', ParseIntPipe) indice: number,
+    @Body('estado') estado: string,
+  ): Promise<Evento> {
+    if (tipo !== 'areas' && tipo !== 'recorridos')
+      throw new BadRequestException('Tipo de trazo inválido');
+    if (estado !== 'Aprobado' && estado !== 'Denegado')
+      throw new BadRequestException('Estado inválido');
+    return this.eventoService.decidirZona(id, tipo, indice, estado);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Evento> {
-    return this.eventoService.findOne(id);
+    return this.eventoService.findOnePublico(id);
   }
 
   @Post()

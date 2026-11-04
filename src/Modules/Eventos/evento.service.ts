@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
@@ -10,6 +12,7 @@ import { esAdmin } from '../Auth/es-admin';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { ActualizarEventoDto, CrearEventoDto } from './dto/EventoDTO';
 import { Evento, ZonaEvento } from './evento.entity';
+import { EventoMailService } from './evento-mail.service';
 
 /** Deja de cada trazo solo lo que se guarda (sin propiedades de mas). */
 const aZonas = (
@@ -18,21 +21,59 @@ const aZonas = (
   trazos.map((t) => ({
     nombre: t.nombre.trim(),
     puntos: t.puntos.map((p) => ({ lat: p.lat, lng: p.lng })),
+    estado: 'Pendiente',
   }));
+
+const conservarZonas = (
+  nuevas: ZonaEvento[], anteriores: ZonaEvento[],
+): ZonaEvento[] => nuevas.map((zona) => {
+  const previa = anteriores.find((otra) => otra.nombre === zona.nombre &&
+    JSON.stringify(otra.puntos) === JSON.stringify(zona.puntos));
+  return previa ? { ...zona, estado: previa.estado ?? 'Aprobado' } : zona;
+});
 
 @Injectable()
 export class EventoService {
+  private readonly logger = new Logger(EventoService.name);
   constructor(
     @InjectRepository(Evento)
     private readonly eventoRepository: Repository<Evento>,
+    @Optional() private readonly mail?: EventoMailService,
   ) {}
 
   /** Lo que ve el deportista: eventos que no han terminado, el mas proximo primero. */
-  findVigentes(): Promise<Evento[]> {
-    return this.eventoRepository.find({
+  async findVigentes(): Promise<Evento[]> {
+    const eventos = await this.eventoRepository.find({
       where: { fechaFin: MoreThanOrEqual(new Date()) },
       order: { fechaInicio: 'ASC', id: 'ASC' },
     });
+    return eventos.map((evento) => {
+      evento.areas = evento.areas.filter((zona) => !zona.estado || zona.estado === 'Aprobado');
+      evento.recorridos = evento.recorridos.filter((zona) => !zona.estado || zona.estado === 'Aprobado');
+      return evento;
+    }).filter((evento) => evento.areas.length > 0 || evento.recorridos.length > 0);
+  }
+
+  findTodosAdmin(): Promise<Evento[]> {
+    return this.eventoRepository.find({ order: { id: 'DESC' } });
+  }
+
+  async decidirZona(id: number, tipo: 'areas' | 'recorridos', indice: number,
+    estado: 'Aprobado' | 'Denegado'): Promise<Evento> {
+    const evento = await this.findOne(id);
+    const zona = evento[tipo][indice];
+    if (!zona) throw new NotFoundException('Trazo no encontrado');
+    if (zona.estado !== 'Pendiente') {
+      throw new BadRequestException('Este trazo ya fue revisado');
+    }
+    zona.estado = estado;
+    const guardado = await this.eventoRepository.save(evento);
+    if (this.mail && evento.creadoPor?.emailUser) {
+      await this.mail.enviarDecision(evento.creadoPor.emailUser, zona.nombre,
+        tipo === 'areas' ? 'área' : 'recorrido', estado)
+        .catch((error: unknown) => this.logger.error('No se pudo enviar la decisión por correo', error));
+    }
+    return guardado;
   }
 
   /** Panel de la empresa: todos los suyos, tambien los que ya terminaron. */
@@ -48,6 +89,15 @@ export class EventoService {
     if (!evento) {
       throw new NotFoundException(`Evento ${id} no encontrado`);
     }
+    return evento;
+  }
+
+  async findOnePublico(id: number): Promise<Evento> {
+    const evento = await this.findOne(id);
+    evento.areas = evento.areas.filter((zona) => !zona.estado || zona.estado === 'Aprobado');
+    evento.recorridos = evento.recorridos.filter((zona) => !zona.estado || zona.estado === 'Aprobado');
+    if (evento.areas.length === 0 && evento.recorridos.length === 0)
+      throw new NotFoundException(`Evento ${id} no encontrado`);
     return evento;
   }
 
@@ -92,9 +142,9 @@ export class EventoService {
     if (dto.categoria !== undefined) evento.categoria = dto.categoria;
     if (dto.fechaInicio !== undefined) evento.fechaInicio = dto.fechaInicio;
     if (dto.fechaFin !== undefined) evento.fechaFin = dto.fechaFin;
-    if (dto.areas !== undefined) evento.areas = aZonas(dto.areas);
+    if (dto.areas !== undefined) evento.areas = conservarZonas(aZonas(dto.areas), evento.areas);
     if (dto.recorridos !== undefined) {
-      evento.recorridos = aZonas(dto.recorridos);
+      evento.recorridos = conservarZonas(aZonas(dto.recorridos), evento.recorridos);
     }
 
     this.validarFechas(evento.fechaInicio, evento.fechaFin);

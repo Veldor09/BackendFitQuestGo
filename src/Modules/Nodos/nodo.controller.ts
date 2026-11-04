@@ -62,6 +62,13 @@ export class NodoController {
     return this.nodoService.findPendientes();
   }
 
+  @Get('admin/todos')
+  @UseGuards(GuardiaRoles)
+  @Roles(RoleId.Admin)
+  findTodosAdmin(): Promise<Nodo[]> {
+    return this.nodoService.findTodosAdmin();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Nodo> {
     return this.nodoService.findOne(id);

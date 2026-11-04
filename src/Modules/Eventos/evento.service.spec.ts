@@ -105,6 +105,34 @@ describe('EventoService', () => {
     service = modulo.get(EventoService);
   });
 
+  describe('moderación de trazos', () => {
+    it('crea áreas y recorridos pendientes', async () => {
+      const creado = await service.create(dto(), EMPRESA.id);
+      expect(creado.areas[0].estado).toBe('Pendiente');
+      expect(creado.recorridos[0].estado).toBe('Pendiente');
+    });
+
+    it('oculta pendientes y denegados de la lista pública', async () => {
+      eventos.find.mockResolvedValue([
+        evento({ id: 1, areas: [{ ...area(), estado: 'Pendiente' }], recorridos: [] }),
+        evento({ id: 2, areas: [{ ...area(), estado: 'Aprobado' }], recorridos: [] }),
+      ]);
+      const visibles = await service.findVigentes();
+      expect(visibles.map((e) => e.id)).toEqual([2]);
+    });
+
+    it('aprueba un solo trazo y rechaza una segunda decisión', async () => {
+      const pendiente = evento({ areas: [{ ...area(), estado: 'Pendiente' }],
+        recorridos: [{ ...recorrido(), estado: 'Pendiente' }] });
+      eventos.findOne.mockResolvedValue(pendiente);
+      const aprobado = await service.decidirZona(3, 'areas', 0, 'Aprobado');
+      expect(aprobado.areas[0].estado).toBe('Aprobado');
+      expect(aprobado.recorridos[0].estado).toBe('Pendiente');
+      await expect(service.decidirZona(3, 'areas', 0, 'Denegado'))
+        .rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
   describe('create', () => {
     it('guarda el evento con sus areas y recorridos a nombre de la empresa', async () => {
       await service.create(
