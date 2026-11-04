@@ -25,7 +25,7 @@ import { Roles } from '../Auth/decorators/roles.decorator';
 import { UsuarioActual } from '../Auth/decorators/usuario-actual.decorator';
 import type { UsuarioAutenticado } from '../Auth/types/carga-jwt';
 import { RoleId } from '../Usuarios/roles.enum';
-import { CambiarEstadoRutaDto, CrearRutaDto } from './dto/RutaDTO';
+import { ActualizarRutaDto, CambiarEstadoRutaDto, CrearRutaDto } from './dto/RutaDTO';
 import { CrearRecorridoDto } from './dto/CrearRecorridoDTO';
 import { RecorridoRuta } from './recorrido-ruta.entity';
 import { Ruta } from './ruta.entity';
@@ -129,6 +129,16 @@ export class RutaController {
       'Cache-Control': 'private, max-age=3600',
     });
     return new StreamableFile(contenido);
+  }
+
+
+  @Patch(':id')
+  actualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarRutaDto,
+    @UsuarioActual() actual: UsuarioAutenticado,
+  ): Promise<Ruta> {
+    return this.rutaService.actualizar(id, dto, actual);
   }
 
   @Delete(':id')
