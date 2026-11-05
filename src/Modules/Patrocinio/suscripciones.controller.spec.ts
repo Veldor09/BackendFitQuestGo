@@ -1,4 +1,3 @@
-
 import type { RequestAutenticado } from '../Auth/types/request-autenticado';
 import { SuscripcionesController } from './suscripciones.controller';
 import { SuscripcionesService } from './suscripciones.service';
@@ -107,11 +106,11 @@ describe('SuscripcionesController - consulta de planes', () => {
   });
 });
 
-describe('SuscripcionesController - solicitud de suscripcion', () => {
+describe('SuscripcionesController - pago de la suscripcion', () => {
   let controlador: SuscripcionesController;
 
   let suscripcionesService: {
-    solicitarSuscripcion: jest.Mock;
+    iniciarPago: jest.Mock;
   };
 
   const request = {
@@ -120,7 +119,10 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
       email: 'usuario@ejemplo.com',
       rol: 1,
     },
-  } as RequestAutenticado;
+    protocol: 'http',
+    get: (cabecera: string) =>
+      cabecera === 'host' ? 'api.test:3001' : undefined,
+  } as unknown as RequestAutenticado;
 
   const dto = {
     planId: 1,
@@ -128,19 +130,15 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
   };
 
   const respuesta = {
-    id: 25,
-    usuarioId: 10,
-    planId: 1,
-    estado: 'Solicitada',
-    pais: 'CR',
-    moneda: 'CRC',
-    creadoEn: new Date('2026-10-22T12:00:00.000Z'),
-    mensaje: 'Solicitud de patrocinio registrada correctamente',
+    suscripcionId: 25,
+    numeroSolicitud: '482913',
+    url: 'https://checkout.onvopay.com/pay/cs_1',
   };
 
   beforeEach(() => {
+    delete process.env.PUBLIC_BASE_URL;
     suscripcionesService = {
-      solicitarSuscripcion: jest.fn().mockResolvedValue(respuesta),
+      iniciarPago: jest.fn().mockResolvedValue(respuesta),
     };
 
     controlador = new SuscripcionesController(
@@ -148,66 +146,102 @@ describe('SuscripcionesController - solicitud de suscripcion', () => {
     );
   });
 
-  it('utiliza el identificador del usuario autenticado', async () => {
-    await controlador.solicitarSuscripcion(request, dto);
+  afterEach(() => {
+    delete process.env.PUBLIC_BASE_URL;
+  });
 
-    expect(suscripcionesService.solicitarSuscripcion).toHaveBeenCalledWith(
+  it('utiliza el identificador y el rol del usuario autenticado', async () => {
+    await controlador.pagar(request, dto);
+
+    expect(suscripcionesService.iniciarPago).toHaveBeenCalledWith(
       10,
       dto,
       1,
-    );
-  });
-
-  it('envia el plan y el pais al servicio', async () => {
-    await controlador.solicitarSuscripcion(request, dto);
-
-    expect(suscripcionesService.solicitarSuscripcion).toHaveBeenCalledWith(
-      10,
-      {
-        planId: 1,
-        pais: 'CR',
-      },
-      1,
+      expect.anything(),
     );
   });
 
   it('no utiliza un identificador de usuario proporcionado en el cuerpo', async () => {
-    const datos = {
-      planId: 1,
-      pais: 'CR',
-      usuarioId: 999,
-    };
+    const datos = { planId: 1, pais: 'CR', usuarioId: 999 };
 
-    await controlador.solicitarSuscripcion(request, datos);
+    await controlador.pagar(request, datos);
 
-    expect(suscripcionesService.solicitarSuscripcion).toHaveBeenCalledWith(
+    expect(suscripcionesService.iniciarPago).toHaveBeenCalledWith(
       10,
       datos,
       1,
+      expect.anything(),
     );
-
-    expect(suscripcionesService.solicitarSuscripcion).not.toHaveBeenCalledWith(
+    expect(suscripcionesService.iniciarPago).not.toHaveBeenCalledWith(
       999,
-      datos,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('arma las URLs de retorno y cancelacion con la direccion del propio servidor', async () => {
+    await controlador.pagar(request, dto);
+
+    const urls = (
+      suscripcionesService.iniciarPago.mock.calls as unknown[][]
+    )[0][3] as {
+      retorno: (id: number) => string;
+      cancelado: string;
+    };
+    expect(urls.retorno(25)).toBe(
+      'http://api.test:3001/patrocinio/pagos/retorno?s=25',
+    );
+    expect(urls.cancelado).toBe(
+      'http://api.test:3001/patrocinio/pagos/cancelado',
+    );
+  });
+
+  it('detras de un proxy usa el protocolo que este informa (https en Render)', async () => {
+    const detrasDeProxy = {
+      ...request,
+      get: (cabecera: string) =>
+        cabecera === 'host'
+          ? 'api.test'
+          : cabecera === 'x-forwarded-proto'
+            ? 'https, http'
+            : undefined,
+    } as unknown as RequestAutenticado;
+
+    await controlador.pagar(detrasDeProxy, dto);
+
+    const urls = (
+      suscripcionesService.iniciarPago.mock.calls as unknown[][]
+    )[0][3] as { cancelado: string };
+    expect(urls.cancelado).toBe('https://api.test/patrocinio/pagos/cancelado');
+  });
+
+  it('con PUBLIC_BASE_URL usa esa direccion (sin barra final)', async () => {
+    process.env.PUBLIC_BASE_URL = 'https://fitquestgo-api.onrender.com/';
+
+    await controlador.pagar(request, dto);
+
+    const urls = (
+      suscripcionesService.iniciarPago.mock.calls as unknown[][]
+    )[0][3] as {
+      retorno: (id: number) => string;
+    };
+    expect(urls.retorno(25)).toBe(
+      'https://fitquestgo-api.onrender.com/patrocinio/pagos/retorno?s=25',
     );
   });
 
   it('devuelve la respuesta generada por el servicio', async () => {
-    const resultado = await controlador.solicitarSuscripcion(
-      request,
-      dto,
-    );
-
-    expect(resultado).toEqual(respuesta);
+    await expect(controlador.pagar(request, dto)).resolves.toEqual(respuesta);
   });
 
   it('propaga los errores del servicio', async () => {
-    suscripcionesService.solicitarSuscripcion.mockRejectedValue(
-      new Error('Error al solicitar la suscripcion'),
+    suscripcionesService.iniciarPago.mockRejectedValue(
+      new Error('Error al iniciar el pago'),
     );
 
-    await expect(
-      controlador.solicitarSuscripcion(request, dto),
-    ).rejects.toThrow('Error al solicitar la suscripcion');
+    await expect(controlador.pagar(request, dto)).rejects.toThrow(
+      'Error al iniciar el pago',
+    );
   });
 });

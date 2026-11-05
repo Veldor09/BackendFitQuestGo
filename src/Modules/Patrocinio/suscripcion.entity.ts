@@ -84,6 +84,17 @@ export class Suscripcion {
   })
   venceEn: Date | null;
 
+  /**
+   * Id de la sesion de Checkout en la pasarela (ONVO). Con el, la solicitud es
+   * un pago en linea; sin el, una de SINPE manual de antes.
+   */
+  @Column({ name: 'pago_ref', type: 'varchar', length: 64, nullable: true })
+  pagoRef: string | null;
+
+  /** Cuando se confirmo el pago en linea. */
+  @Column({ name: 'pagada_en', type: 'timestamptz', nullable: true })
+  pagadaEn: Date | null;
+
   @Column({
     name: 'administrador_id',
     type: 'int',
