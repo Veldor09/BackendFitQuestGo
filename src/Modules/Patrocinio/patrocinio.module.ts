@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -9,6 +8,8 @@ import { Nodo } from '../Nodos/nodo.entity';
 import { NotificacionesModule } from '../Notificaciones/notificaciones.module';
 
 import { DestacadosService } from './destacados.service';
+import { PagosController } from './pagos.controller';
+import { PASARELA_PAGOS, PasarelaOnvo } from './pasarela-pagos';
 import { PatrocinioAvisosService } from './patrocinio-avisos.service';
 import { PatrocinioController } from './patrocinio.controller';
 import { SuscripcionAvisosTask } from './suscripcion-avisos.task';
@@ -43,12 +44,15 @@ import { SuscripcionesAdminController } from './suscripciones-admin.controller';
     PatrocinioController,
     SuscripcionesController,
     SuscripcionesAdminController,
+    PagosController,
   ],
   providers: [
     DestacadosService,
     PatrocinioAvisosService,
     SuscripcionAvisosTask,
     SuscripcionesService,
+    // La pasarela de cobro en linea: sin ONVO_SECRET_KEY queda no disponible.
+    { provide: PASARELA_PAGOS, useFactory: () => new PasarelaOnvo() },
     {
       provide: SUSCRIPCIONES_VIGENTES,
       useClass: SuscripcionesVigentesSql,

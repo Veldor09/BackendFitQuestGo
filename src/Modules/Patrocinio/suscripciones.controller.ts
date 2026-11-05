@@ -1,4 +1,3 @@
-
 import {
   Body,
   Controller,
@@ -12,15 +11,14 @@ import {
 import { GuardiaJwt } from '../Auth/guards/jwt.guard';
 import type { RequestAutenticado } from '../Auth/types/request-autenticado';
 import { audienciaParaRol } from './pago';
+import { urlBasePublica } from './pagos-urls';
 import { SolicitarSuscripcionDto } from './solicitar-suscripcion.dto';
 import { SuscripcionesService } from './suscripciones.service';
 
 @Controller('patrocinio')
 @UseGuards(GuardiaJwt)
 export class SuscripcionesController {
-  constructor(
-    private readonly suscripcionesService: SuscripcionesService,
-  ) {}
+  constructor(private readonly suscripcionesService: SuscripcionesService) {}
 
   /** Los planes que le tocan a quien pregunta (empresa o usuario) en [pais]. */
   @Get('planes')
@@ -40,15 +38,25 @@ export class SuscripcionesController {
     return this.suscripcionesService.miSuscripcion(request.usuario.id);
   }
 
-  @Post('suscripciones')
-  solicitarSuscripcion(
+  /**
+   * Empieza el pago de un plan: devuelve la URL de la pantalla de pago (ONVO).
+   * El plan se activa solo cuando el pago se confirma.
+   */
+  @Post('suscripciones/pagar')
+  pagar(
     @Req() request: RequestAutenticado,
     @Body() dto: SolicitarSuscripcionDto,
   ) {
-    return this.suscripcionesService.solicitarSuscripcion(
+    const base = urlBasePublica(request);
+    return this.suscripcionesService.iniciarPago(
       request.usuario.id,
       dto,
       request.usuario.rol,
+      {
+        retorno: (suscripcionId) =>
+          `${base}/patrocinio/pagos/retorno?s=${suscripcionId}`,
+        cancelado: `${base}/patrocinio/pagos/cancelado`,
+      },
     );
   }
 }

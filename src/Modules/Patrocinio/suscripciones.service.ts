@@ -4,9 +4,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -19,11 +21,12 @@ import { AuditoriaService } from '../Auditoria/auditoria.service';
 import { monedaParaPais } from './monedas';
 import {
   type AudienciaPlan,
+  type MetodoPago,
   audienciaParaRol,
   metodoPagoParaPais,
   pagoDisponible,
-  SINPE_MOVIL_NUMERO,
 } from './pago';
+import { PASARELA_PAGOS, type PasarelaPagos } from './pasarela-pagos';
 import { PatrocinioAvisosService } from './patrocinio-avisos.service';
 import { User } from '../Usuarios/user.entity';
 import { PlanPatrocinio } from './plan-patrocinio.entity';
@@ -73,6 +76,11 @@ export class SuscripcionesService {
     // aprueba o rechaza. Opcional: sin el, aprobar y rechazar funcionan igual.
     @Optional()
     private readonly avisos?: PatrocinioAvisosService,
+
+    // La pasarela que cobra en linea (ONVO). Sin ella, pagar no esta disponible.
+    @Optional()
+    @Inject(PASARELA_PAGOS)
+    private readonly pasarela?: PasarelaPagos,
   ) {}
 
   /**
@@ -118,10 +126,9 @@ export class SuscripcionesService {
       pais: pais?.trim().toUpperCase() || null,
       moneda,
       metodoPago,
-      // PayPal (resto del mundo) aun no esta configurado: se ven los planes pero
-      // todavia no se pueden solicitar.
-      pagoDisponible: pagoDisponible(metodoPago),
-      sinpeNumero: metodoPago === 'sinpe' ? SINPE_MOVIL_NUMERO : null,
+      // PayPal (resto del mundo) aun no esta configurado y ONVO necesita sus
+      // llaves: sin ellas se ven los planes pero todavia no se puede pagar.
+      pagoDisponible: this.puedeCobrar(metodoPago),
       planes: planesDisponibles,
     };
   }
@@ -157,15 +164,14 @@ export class SuscripcionesService {
         })
       )?.importe ??
       null;
-    const metodoPago = metodoPagoParaPais(suscripcion.pais);
 
     return {
       id: suscripcion.id,
       numeroSolicitud: suscripcion.numeroSolicitud,
       audiencia: plan?.audiencia ?? null,
       monto: precio,
-      metodoPago,
-      sinpeNumero: metodoPago === 'sinpe' ? SINPE_MOVIL_NUMERO : null,
+      // Con referencia es un pago en linea; sin ella, una solicitud manual de antes.
+      pagoEnLinea: suscripcion.pagoRef != null,
       estado: suscripcion.estado,
       vigente:
         suscripcion.estado === EstadoSuscripcion.Activa &&
@@ -205,6 +211,8 @@ export class SuscripcionesService {
         's.iniciaEn AS "iniciaEn"',
         's.venceEn AS "venceEn"',
         's.creadoEn AS "creadoEn"',
+        's.pagoRef AS "pagoRef"',
+        's.pagadaEn AS "pagadaEn"',
         'u.id AS "usuarioId"',
         'u.nombreUser AS "usuarioNombre"',
         'u.emailUser AS "usuarioEmail"',
@@ -298,12 +306,30 @@ export class SuscripcionesService {
     );
   }
 
-  async solicitarSuscripcion(
+  /**
+   * Se puede cobrar con este metodo: ONVO necesita sus llaves y PayPal todavia
+   * no esta configurado.
+   */
+  private puedeCobrar(metodo: MetodoPago): boolean {
+    return (
+      pagoDisponible(metodo) &&
+      (metodo !== 'onvo' || this.pasarela?.disponible === true)
+    );
+  }
+
+  /**
+   * Empieza un pago en linea: deja la solicitud en `Solicitada`, crea la sesion de
+   * pago en la pasarela y devuelve su URL. El monto sale siempre del precio del
+   * plan, nunca de lo que mande la app. El plan se activa solo cuando el pago se
+   * confirma (`confirmarPago`).
+   */
+  async iniciarPago(
     usuarioId: number,
     dto: SolicitarSuscripcionDto,
-    /** Rol de quien pide: un plan de empresa no es para un usuario y al reves. */
-    rol?: number,
-  ) {
+    /** Rol de quien paga: un plan de empresa no es para un usuario y al reves. */
+    rol: number | undefined,
+    urls: { retorno: (suscripcionId: number) => string; cancelado: string },
+  ): Promise<{ suscripcionId: number; numeroSolicitud: string; url: string }> {
     const plan = await this.planesRepository.findOne({
       where: {
         id: dto.planId,
@@ -322,8 +348,7 @@ export class SuscripcionesService {
     }
 
     const metodoPago = metodoPagoParaPais(dto.pais);
-    if (!pagoDisponible(metodoPago)) {
-      // PayPal todavia no esta configurado.
+    if (!this.puedeCobrar(metodoPago) || !this.pasarela) {
       throw new BadRequestException('PAGO_NO_DISPONIBLE');
     }
 
@@ -343,69 +368,88 @@ export class SuscripcionesService {
       );
     }
 
-    const suscripcionExistente =
-      await this.suscripcionesRepository.findOne({
-        where: [
-          {
-            usuarioId,
-            estado: EstadoSuscripcion.Solicitada,
-          },
-          {
-            usuarioId,
-            estado: EstadoSuscripcion.Activa,
-          },
-        ],
-      });
+    const yaActiva = await this.suscripcionesRepository.findOne({
+      where: { usuarioId, estado: EstadoSuscripcion.Activa },
+    });
+    if (yaActiva) {
+      // Nada marca como vencidas las suscripciones: una Activa con la fecha
+      // pasada ya no vale y no debe impedir renovar.
+      if (yaActiva.venceEn && yaActiva.venceEn.getTime() <= Date.now()) {
+        yaActiva.estado = EstadoSuscripcion.Vencida;
+        await this.suscripcionesRepository.save(yaActiva);
+      } else {
+        throw new ConflictException(
+          'Ya tiene una solicitud pendiente o una suscripcion activa',
+        );
+      }
+    }
 
-    if (suscripcionExistente) {
-      throw new ConflictException(
-        'Ya tiene una solicitud pendiente o una suscripcion activa',
-      );
+    const pendiente = await this.suscripcionesRepository.findOne({
+      where: { usuarioId, estado: EstadoSuscripcion.Solicitada },
+    });
+    if (pendiente) {
+      // Una solicitud manual en revision sigue su curso; un pago en linea que
+      // nunca se completo no debe trabar un nuevo intento.
+      if (pendiente.pagoRef == null) {
+        throw new ConflictException(
+          'Ya tiene una solicitud pendiente o una suscripcion activa',
+        );
+      }
+
+      // Antes de cerrarlo hay que preguntar a la pasarela: un pago que ONVO aun
+      // no marcaba como pagado (SINPE) puede haberse completado, y cerrarlo
+      // dejaria a la persona cobrada y sin plan.
+      let estadoPago: Awaited<ReturnType<SuscripcionesService['confirmarPago']>>;
+      try {
+        estadoPago = await this.confirmarPago(pendiente.id);
+      } catch {
+        throw new ServiceUnavailableException('PAGO_ERROR');
+      }
+      if (estadoPago === 'activada' || estadoPago === 'ya_activa') {
+        throw new ConflictException(
+          'Ya tiene una solicitud pendiente o una suscripcion activa',
+        );
+      }
+      await this.cerrarSiSigueSolicitada(pendiente.id);
+    }
+
+    const usuario = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: usuarioId } });
+    if (!usuario) {
+      throw new NotFoundException('El usuario no existe');
     }
 
     const numeroSolicitud = await this.nuevoNumeroSolicitud();
 
-    const nuevaSuscripcion = this.suscripcionesRepository.create({
-      usuarioId,
-      planId: plan.id,
-      estado: EstadoSuscripcion.Solicitada,
-      numeroSolicitud,
-      pais: dto.pais,
-      moneda,
-      precioAplicado: null,
-      iniciaEn: null,
-      venceEn: null,
-      administradorId: null,
-    });
-
+    let guardada: Suscripcion;
     try {
-      const suscripcionGuardada =
-        await this.suscripcionesRepository.save(nuevaSuscripcion);
-
-      return {
-        id: suscripcionGuardada.id,
-        usuarioId: suscripcionGuardada.usuarioId,
-        planId: suscripcionGuardada.planId,
-        estado: suscripcionGuardada.estado,
-        numeroSolicitud: suscripcionGuardada.numeroSolicitud,
-        monto: precio.importe,
-        metodoPago,
-        sinpeNumero: SINPE_MOVIL_NUMERO,
-        pais: suscripcionGuardada.pais,
-        moneda: suscripcionGuardada.moneda,
-        creadoEn: suscripcionGuardada.creadoEn,
-        mensaje: 'Solicitud de patrocinio registrada correctamente',
-      };
+      guardada = await this.suscripcionesRepository.save(
+        this.suscripcionesRepository.create({
+          usuarioId,
+          planId: plan.id,
+          estado: EstadoSuscripcion.Solicitada,
+          numeroSolicitud,
+          pagoRef: null,
+          pagadaEn: null,
+          pais: dto.pais,
+          moneda,
+          // El precio que se cobra es el de este momento, aunque el plan cambie.
+          precioAplicado: precio.importe,
+          iniciaEn: null,
+          venceEn: null,
+          administradorId: null,
+        }),
+      );
     } catch (error) {
       if (error instanceof QueryFailedError) {
         const codigo =
-          (error as QueryFailedError & {
-            code?: string;
-            driverError?: { code?: string };
-          }).driverError?.code ??
-          (error as QueryFailedError & {
-            code?: string;
-          }).code;
+          (
+            error as QueryFailedError & {
+              code?: string;
+              driverError?: { code?: string };
+            }
+          ).driverError?.code ?? (error as QueryFailedError & { code?: string }).code;
 
         if (codigo === PG_UNIQUE_VIOLATION) {
           throw new ConflictException(
@@ -416,6 +460,129 @@ export class SuscripcionesService {
 
       throw error;
     }
+
+    try {
+      const sesion = await this.pasarela.crearSesion({
+        monto: Number(precio.importe),
+        moneda: 'CRC',
+        descripcion: `${plan.nombre} #${numeroSolicitud}`,
+        clienteNombre: usuario.nombreUser,
+        clienteEmail: usuario.emailUser,
+        redirectUrl: urls.retorno(guardada.id),
+        cancelUrl: urls.cancelado,
+        metadata: {
+          suscripcionId: String(guardada.id),
+          numeroSolicitud,
+        },
+      });
+
+      guardada.pagoRef = sesion.id;
+      await this.suscripcionesRepository.save(guardada);
+
+      return {
+        suscripcionId: guardada.id,
+        numeroSolicitud,
+        url: sesion.url,
+      };
+    } catch {
+      // La pasarela fallo: la solicitud no sirve y no debe trabar el siguiente intento.
+      guardada.estado = EstadoSuscripcion.Rechazada;
+      await this.suscripcionesRepository.save(guardada);
+      throw new ServiceUnavailableException('PAGO_ERROR');
+    }
+  }
+
+  /**
+   * Confirma un pago en linea preguntandole a la pasarela (nunca confiando en lo
+   * que llegue en la URL ni en el cuerpo del webhook). Si esta pagado, activa el
+   * plan: es seguro llamarlo varias veces (retorno + webhook) porque solo la
+   * primera activa y avisa.
+   */
+  async confirmarPago(
+    suscripcionId: number,
+  ): Promise<'activada' | 'ya_activa' | 'pendiente' | 'no_encontrada'> {
+    const suscripcion = await this.suscripcionesRepository.findOne({
+      where: { id: suscripcionId },
+    });
+    if (!suscripcion || !suscripcion.pagoRef) return 'no_encontrada';
+    if (suscripcion.estado === EstadoSuscripcion.Activa) return 'ya_activa';
+    if (suscripcion.estado !== EstadoSuscripcion.Solicitada || !this.pasarela) {
+      return 'pendiente';
+    }
+
+    const sesion = await this.pasarela.obtenerSesion(suscripcion.pagoRef);
+    if (!sesion.pagada) return 'pendiente';
+
+    const plan = await this.planesRepository.findOne({
+      where: { id: suscripcion.planId },
+    });
+    const duracionDias = plan?.duracionDias ?? 30;
+
+    const resultado = await this.dataSource.transaction(async (manager) => {
+      const repositorio = manager.getRepository(Suscripcion);
+      const bloqueada = await repositorio.findOne({
+        where: { id: suscripcionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!bloqueada) return 'no_encontrada' as const;
+      if (bloqueada.estado === EstadoSuscripcion.Activa) {
+        return 'ya_activa' as const;
+      }
+      if (bloqueada.estado !== EstadoSuscripcion.Solicitada) {
+        return 'pendiente' as const;
+      }
+
+      const ahora = new Date();
+      const vencimiento = new Date(ahora);
+      vencimiento.setUTCDate(vencimiento.getUTCDate() + duracionDias);
+
+      bloqueada.estado = EstadoSuscripcion.Activa;
+      bloqueada.iniciaEn = ahora;
+      bloqueada.venceEn = vencimiento;
+      bloqueada.pagadaEn = ahora;
+      bloqueada.administradorId = null;
+      await repositorio.save(bloqueada);
+
+      return 'activada' as const;
+    });
+
+    // Ya confirmada la activacion: el aviso no puede deshacerla ni hacerla fallar.
+    if (resultado === 'activada') {
+      await this.avisos?.planAprobado(
+        suscripcion.usuarioId,
+        suscripcion.id,
+        duracionDias,
+        plan?.audiencia ?? 'usuario',
+      );
+    }
+    return resultado;
+  }
+
+  /**
+   * Cierra un pago en linea que no se completo, solo si sigue `Solicitada`: si
+   * otra llamada la activo mientras tanto, no se pisa.
+   */
+  private async cerrarSiSigueSolicitada(suscripcionId: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const repositorio = manager.getRepository(Suscripcion);
+      const actual = await repositorio.findOne({
+        where: { id: suscripcionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (actual && actual.estado === EstadoSuscripcion.Solicitada) {
+        actual.estado = EstadoSuscripcion.Rechazada;
+        await repositorio.save(actual);
+      }
+    });
+  }
+
+  /** El webhook trae la sesion de ONVO: se busca su solicitud y se confirma. */
+  async confirmarPorSesion(sesionId: string): Promise<void> {
+    const suscripcion = await this.suscripcionesRepository.findOne({
+      where: { pagoRef: sesionId },
+    });
+    if (suscripcion) await this.confirmarPago(suscripcion.id);
   }
 
   async aprobarSuscripcion(
@@ -562,6 +729,14 @@ export class SuscripcionesService {
       if (!suscripcion) {
         throw new NotFoundException(
           'La suscripcion no existe',
+        );
+      }
+
+      // Un pago en linea en curso se cierra solo (o se activa al confirmarse): si un
+      // admin lo rechazara y luego se pagara, la persona quedaria cobrada sin plan.
+      if (suscripcion.pagoRef != null) {
+        throw new ConflictException(
+          'Un pago en linea en curso no se puede rechazar a mano',
         );
       }
 
