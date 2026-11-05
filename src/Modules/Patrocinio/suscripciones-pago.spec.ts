@@ -403,6 +403,92 @@ describe('SuscripcionesService - pago en linea, audiencia y gestion', () => {
     });
   });
 
+  describe('miSuscripcion confirma un pago en linea en curso', () => {
+    const enCurso = () => ({
+      id: 7,
+      usuarioId: 10,
+      planId: 2,
+      estado: EstadoSuscripcion.Solicitada,
+      pagoRef: 'cs_1',
+      numeroSolicitud: '482913',
+      pais: 'CR',
+      moneda: 'CRC',
+      precioAplicado: '2500.00',
+      iniciaEn: null,
+      venceEn: null,
+      pagadaEn: null,
+      creadoEn: new Date('2026-11-04'),
+    });
+
+    it('si ONVO ya lo marco pagado, la consulta lo activa y lo devuelve activo (sin esperar al webhook)', async () => {
+      let activada = false;
+      suscripciones.findOne.mockImplementation(() =>
+        Promise.resolve(
+          activada
+            ? {
+                ...enCurso(),
+                estado: EstadoSuscripcion.Activa,
+                iniciaEn: new Date(),
+                venceEn: new Date(Date.now() + 30 * 86400000),
+              }
+            : enCurso(),
+        ),
+      );
+      repoTx.findOne.mockImplementation(() => Promise.resolve(enCurso()));
+      repoTx.save.mockImplementation((x: { estado?: string }) => {
+        if (x.estado === 'Activa') activada = true;
+        return Promise.resolve(x);
+      });
+      pasarela.obtenerSesion.mockResolvedValue({
+        id: 'cs_1',
+        pagada: true,
+        expirada: false,
+        metadata: {},
+      });
+
+      const r = await servicio.miSuscripcion(10);
+
+      expect(r).toMatchObject({ estado: 'Activa', vigente: true });
+      expect(avisos.planAprobado).toHaveBeenCalledTimes(1);
+    });
+
+    it('si todavia no se pago, sigue Solicitada y no consulta de mas', async () => {
+      suscripciones.findOne.mockResolvedValue(enCurso());
+      pasarela.obtenerSesion.mockResolvedValue({
+        id: 'cs_1',
+        pagada: false,
+        expirada: false,
+        metadata: {},
+      });
+
+      const r = await servicio.miSuscripcion(10);
+
+      expect(r).toMatchObject({ estado: 'Solicitada', pagoEnLinea: true });
+      expect(repoTx.save).not.toHaveBeenCalled();
+    });
+
+    it('si ONVO no responde, devuelve lo que hay en vez de fallar', async () => {
+      suscripciones.findOne.mockResolvedValue(enCurso());
+      pasarela.obtenerSesion.mockRejectedValue(new Error('ONVO respondio 500'));
+
+      await expect(servicio.miSuscripcion(10)).resolves.toMatchObject({
+        estado: 'Solicitada',
+      });
+    });
+
+    it('una suscripcion que no es un pago en curso no consulta a ONVO', async () => {
+      suscripciones.findOne.mockResolvedValue({
+        ...enCurso(),
+        estado: EstadoSuscripcion.Activa,
+        venceEn: new Date(Date.now() + 86400000),
+      });
+
+      await servicio.miSuscripcion(10);
+
+      expect(pasarela.obtenerSesion).not.toHaveBeenCalled();
+    });
+  });
+
   describe('confirmarPago', () => {
     const solicitada = () => ({
       id: 7,

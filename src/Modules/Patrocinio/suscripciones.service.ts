@@ -140,11 +140,29 @@ export class SuscripcionesService {
    * alguien lo actualiza, la fecha no miente).
    */
   async miSuscripcion(usuarioId: number) {
-    const suscripcion = await this.suscripcionesRepository.findOne({
-      where: { usuarioId },
-      order: { creadoEn: 'DESC', id: 'DESC' },
-    });
+    const buscar = () =>
+      this.suscripcionesRepository.findOne({
+        where: { usuarioId },
+        order: { creadoEn: 'DESC', id: 'DESC' },
+      });
+    let suscripcion = await buscar();
     if (!suscripcion) return null;
+
+    // Un pago en linea en curso se confirma al consultarlo: ONVO marca la sesion
+    // como pagada un instante DESPUES de devolver a la persona a la app, y el
+    // webhook puede no llegar (o tardar). Asi no depende de el.
+    if (
+      suscripcion.estado === EstadoSuscripcion.Solicitada &&
+      suscripcion.pagoRef
+    ) {
+      try {
+        if ((await this.confirmarPago(suscripcion.id)) === 'activada') {
+          suscripcion = (await buscar()) ?? suscripcion;
+        }
+      } catch {
+        // La pasarela no respondio: se devuelve lo que hay, sin fallar.
+      }
+    }
 
     const plan = await this.planesRepository.findOne({
       where: { id: suscripcion.planId },
